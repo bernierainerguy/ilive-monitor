@@ -9,6 +9,21 @@ Add entries under **Unreleased** as you go; `npm run release:minor|patch|major` 
 
 ## [Unreleased]
 
+### Fixed
+- A send pulled below about -53 dB was ghosted after every move. That's the rack's quietest step short of off, so
+  its echo came back as -53 and looked like someone else's move. Echoes are now compared in the rack's own
+  0.5 dB steps.
+- The screen shows the level the rack really holds: a send set to -70 reads -53.5, as it is on the rack.
+- Clicking a "?" level to look, then clicking away, sent the guessed level (usually off). The box now starts empty
+  on an unknown level, and nothing is sent unless something was typed.
+- Connect on the rack already in use no longer drops and remakes the link, which over MIDI made every send unknown
+  again. The key reads "Connected" instead.
+- A fader no longer jumps if the window, or a banner above it, changes height mid-drag.
+- Removing the password when its file can't be deleted keeps the password, instead of it vanishing for the
+  session and coming back at the next launch.
+- The mix chosen in 0.1 or 0.2 carries over, instead of being asked for again.
+- The "no release on the website yet" message only appears for that case, not for every 404 from the site.
+
 ## [0.4.0] - 2026-09-25
 
 ### Changed

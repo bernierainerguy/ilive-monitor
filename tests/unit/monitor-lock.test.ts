@@ -99,10 +99,14 @@ describe('monitor policy: send levels to the chosen aux, nothing else', () => {
 });
 
 describe('MixerService: the lock in the main process', () => {
-  function service(opts: { live?: boolean; bus?: number | null } = {}) {
+  function service(opts: { live?: boolean; bus?: number | null; normalise?: (db: number) => number } = {}) {
     const cache = new StateCache(createDefaultMixerState(), 1);
     const sent: MixerChange[] = [];
-    const session = { supports: () => opts.live ?? true, send: (c: MixerChange[]) => (sent.push(...c), { sent: c.length, unsupported: 0 }) } as unknown as RackSession;
+    const session = {
+      supports: () => opts.live ?? true,
+      normaliseLevel: opts.normalise ?? ((db: number) => db),
+      send: (c: MixerChange[]) => (sent.push(...c), { sent: c.length, unsupported: 0 }),
+    } as unknown as RackSession;
     const svc = new MixerService(cache, session, new Logger('error'), () => (opts.bus === undefined ? AUX : opts.bus));
     return { cache, sent, svc };
   }
@@ -117,6 +121,13 @@ describe('MixerService: the lock in the main process', () => {
     expect(cache.state.inputs[1]!.muted).toBe(false);
   });
 
+  it('shows and sends the level the rack will really hold, not the one asked for', () => {
+    const { cache, sent, svc } = service({ normalise: (db) => (db < -53.5 ? -53.5 : Math.round(db * 2) / 2) });
+    svc.dispatch([level(-70)]);
+    expect(cache.state.inputs[0]!.sends[AUX]!.levelDb).toBe(-53.5);
+    expect(sent).toEqual([level(-53.5)]);
+  });
+
   it('changes nothing while the rack cannot take it (offline, or no mix configuration)', () => {
     const { cache, sent, svc } = service({ live: false });
     expect(svc.dispatch([level(-12)])).toMatchObject({ accepted: 0, rejected: [{ index: 0, reason: 'Not connected to the rack' }] });
@@ -127,7 +138,7 @@ describe('MixerService: the lock in the main process', () => {
   it('follows the bus in Settings at the moment of each move', () => {
     let bus: number | null = AUX;
     const cache = new StateCache(createDefaultMixerState(), 1);
-    const session = { supports: () => true, send: () => ({ sent: 1, unsupported: 0 }) } as unknown as RackSession;
+    const session = { supports: () => true, normaliseLevel: (db: number) => db, send: () => ({ sent: 1, unsupported: 0 }) } as unknown as RackSession;
     const svc = new MixerService(cache, session, new Logger('error'), () => bus);
     expect(svc.dispatch([level(0)]).accepted).toBe(1);
     bus = OTHER_AUX;
@@ -170,6 +181,10 @@ describe('SettingsService: the bus is kept between launches', () => {
     expect(parseSettings({ aux: 1.5 }).aux).toBeNull();
     expect(parseSettings({ aux: 0 }).aux).toBeNull();
     expect(parseSettings({ aux: 32 }).aux).toBe(32);
+    // 0.1/0.2 stored the mix index as `bus`: read through the default layout.
+    expect(parseSettings({ bus: AUX }).aux).toBe(3);
+    expect(parseSettings({ bus: GROUP }).aux).toBeNull(); // not an aux: ask again
+    expect(parseSettings({ aux: 5, bus: AUX }).aux).toBe(5); // a saved aux wins
     expect(parseSettings(null).schema).toBe(1);
     s.update({ aux: -1 });
     expect(s.current.aux).toBeNull();

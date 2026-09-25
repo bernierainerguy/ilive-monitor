@@ -1,5 +1,4 @@
 import { coalesceKey, type MixerChange } from '@shared/domain/changes';
-import { FADER_MIN_DB } from '@shared/domain/units';
 import { isMonitorBus, monitorSources } from '@shared/monitorPolicy';
 import {
   MAX_MISSED_PROBES,
@@ -109,6 +108,17 @@ export class RackSession {
   get isLive(): boolean {
     const p = this._status.phase;
     return !!this.protocol && (p === 'online' || p === 'degraded' || p === 'syncing');
+  }
+
+  /** The level the rack will hold for `db`, after its rounding (see MixRackProtocol.normaliseLevel). */
+  normaliseLevel(db: number): number {
+    return this.protocol?.normaliseLevel?.(db) ?? db;
+  }
+
+  /** Already connected, or connecting, to this rack: a second Connect would only drop the link and start again. */
+  isConnectedTo(targetId: string): boolean {
+    const p = this._status.phase;
+    return this._status.targetId === targetId && (p === 'online' || p === 'degraded' || p === 'syncing' || p === 'connecting');
   }
 
   /**
@@ -405,8 +415,10 @@ export class RackSession {
 
   private isOurEcho(key: string, c: MixerChange): boolean {
     if (c.t !== 'send' || c.patch.levelDb === undefined) return true;
-    const heard = c.patch.levelDb;
-    return (this.recentLevels.get(key) ?? []).some((sent) => sameLevel(sent, heard));
+    // Compared in the rack's own steps: -7.83 comes back as -8, and -70 as -53 (its quietest step short of off).
+    const rack = (db: number) => this.protocol?.normaliseLevel?.(db) ?? db;
+    const heard = rack(c.patch.levelDb);
+    return (this.recentLevels.get(key) ?? []).some((sent) => rack(sent) === heard);
   }
 
   /** The bus in Settings changed: report what's unconfirmed on the new one. */
@@ -443,16 +455,6 @@ export class RackSession {
  * that hasn't been given Local Network access with EHOSTUNREACH, even when the
  * rack answers ping and other apps, so that case names the setting.
  */
-/**
- * Two send levels the rack can't tell apart. iLive MIDI carries levels in 0.5 dB steps, so an echo of -7.83 comes
- * back as -8. Anything at or below the fader's floor is off.
- */
-export function sameLevel(a: number, b: number): boolean {
-  const off = (v: number) => v <= FADER_MIN_DB;
-  if (off(a) || off(b)) return off(a) && off(b);
-  return Math.abs(a - b) <= 0.5;
-}
-
 export function connectErrorMessage(err: unknown, target: Pick<RackTarget, 'host' | 'port'>): string {
   const code = (err as { code?: string } | null)?.code;
   const where = `${target.host}:${target.port}`;

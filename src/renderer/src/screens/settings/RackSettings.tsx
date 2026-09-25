@@ -18,6 +18,8 @@ export function RackSettings() {
   const notify = useAppStore((s) => s.notify);
   // Start on the rack in use, else the first saved one, so Connect is ready to press.
   const [editing, setEditing] = useState<RackTarget | null>(() => targets.find((x) => x.id === rack.targetId) ?? targets[0] ?? null);
+  // Already on this rack: Connect would only drop the link (Save applies an edited address or configuration).
+  const connected = !!editing && rack.targetId === editing.id && (rack.phase === 'online' || rack.phase === 'degraded');
   // A refused save (a bad port, or Settings locked meanwhile) says why instead of failing silently.
   const attempt = (fn: () => Promise<unknown>) =>
     fn().catch((e: Error) => notify(e.message.replace(/^Error invoking remote method '[^']+': (Error: )?/, ''), 'error'));
@@ -79,8 +81,8 @@ export function RackSettings() {
       </Stack>
       <Stack spacing={2}>
         <Stack direction="row" spacing={1}>
-          <Button variant="contained" disabled={!editing || !!(editing.mixConfig && mixConfigError(editing.mixConfig))} onClick={() => void attempt(async () => { if (!editing) return; await invoke('rack:saveTarget', editing); await invoke('rack:connect', { targetId: editing.id }); })}>
-            Connect{editing ? ` to ${editing.name}` : ''}
+          <Button variant="contained" disabled={!editing || connected || !!(editing.mixConfig && mixConfigError(editing.mixConfig))} onClick={() => void attempt(async () => { if (!editing) return; await invoke('rack:saveTarget', editing); await invoke('rack:connect', { targetId: editing.id }); })}>
+            {connected ? 'Connected' : 'Connect'}{editing ? ` to ${editing.name}` : ''}
           </Button>
           <Button disabled={rack.phase === 'offline'} onClick={() => void attempt(() => invoke('rack:disconnect', undefined))}>Disconnect</Button>
         </Stack>

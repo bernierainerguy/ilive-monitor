@@ -1,4 +1,6 @@
 import { IDR48 } from '@shared/domain/ids';
+import { createDefaultMixerState } from '@shared/domain/defaults';
+import { monitorBuses } from '@shared/monitorPolicy';
 import { parseMixConfig } from '@shared/mixLayout';
 import { DEFAULT_SETTINGS, type MonitorSettings, type RackTarget } from '@shared/settings';
 import type { SettingsPatch } from '@shared/ipc';
@@ -96,5 +98,15 @@ export function parseSettings(v: unknown): MonitorSettings {
   if (!isObj(v)) return DEFAULT_SETTINGS;
   const racks = Array.isArray(v['racks']) ? v['racks'].map(parseRack).filter((r): r is RackTarget => r !== null) : [];
   const last = typeof v['lastTargetId'] === 'string' && racks.some((r) => r.id === v['lastTargetId']) ? (v['lastTargetId'] as string) : null;
-  return { schema: 1, racks, lastTargetId: last, aux: parseAux(v['aux']), themeId: parseTheme(v['themeId']) };
+  return { schema: 1, racks, lastTargetId: last, aux: parseAux(v['aux']) ?? auxFromOldBus(v['bus']), themeId: parseTheme(v['themeId']) };
+}
+
+/**
+ * 0.1 and 0.2 saved the mix as `bus`, a mix index. Their bus picker offered the default layout's auxes (before
+ * connecting) or the rack's; the default layout is the best reading of it, and Settings shows the result to check.
+ */
+function auxFromOldBus(v: unknown): number | null {
+  if (typeof v !== 'number' || !Number.isInteger(v)) return null;
+  const n = monitorBuses(createDefaultMixerState()).findIndex((m) => m.ref.index === v);
+  return n < 0 ? null : n + 1;
 }

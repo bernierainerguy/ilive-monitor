@@ -20,6 +20,11 @@ export interface MixRackProtocol {
 
   /** Whether this protocol can express the change on the wire. */
   supports(change: MixerChange): boolean;
+  /**
+   * The level the rack will actually hold for `db`, after its own rounding (iLive MIDI: 0.5 dB steps, and nothing
+   * quieter than about -53 dB except off). Absent: levels arrive exactly as sent.
+   */
+  normaliseLevel?(db: number): number;
   /** Encode and write. Caller must check `supports` first. */
   send(change: MixerChange): void;
   recallScene(sceneNumber: number): void;

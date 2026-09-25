@@ -27,7 +27,8 @@ export class MixerService {
       const r = authorizeMonitorChange(this.cache.state, bus, c);
       if (!r.ok) rejected.push({ index, reason: r.reason });
       else if (!this.session.supports(c)) rejected.push({ index, reason: 'Not connected to the rack' });
-      else accepted.push(c);
+      // What the rack will actually hold (-70 is -53.5 on iLive MIDI): the screen shows the truth, not the ask.
+      else accepted.push(c.t === 'send' && c.patch.levelDb !== undefined ? { ...c, patch: { levelDb: this.session.normaliseLevel(c.patch.levelDb) } } : c);
     });
     if (rejected.length) this.log.warn('user', `Rejected ${rejected.length} change(s)`, { reason: rejected[0]?.reason, origin });
     if (!accepted.length) return { accepted: 0, rejected };

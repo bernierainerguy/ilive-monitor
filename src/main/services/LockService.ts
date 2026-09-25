@@ -96,12 +96,14 @@ export class LockService {
   async setPassword(next: unknown): Promise<LockStatus> {
     this.require();
     if (next === null) {
+      // The file goes first (after any queued write, so a late one can't bring it back). If it can't be removed,
+      // the password stays, rather than being gone this session and back at the next launch.
+      const removal = this.writing.catch(() => undefined).then(() => rm(this.path, { force: true }));
+      this.writing = removal;
+      await removal;
       this.hash = null;
       this.failures = 0;
       this.retryAt = null;
-      // After any queued write, so a late one can't bring the password back.
-      this.writing = this.writing.catch(() => undefined).then(() => rm(this.path, { force: true }));
-      await this.writing;
       this.log.info('user', 'Settings password removed');
     } else {
       if (typeof next !== 'string' || next.length < MIN_PASSWORD_LENGTH) throw new Error(`Use at least ${MIN_PASSWORD_LENGTH} characters.`);

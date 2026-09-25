@@ -3,7 +3,8 @@ import { createDefaultMixerState } from '@shared/domain/defaults';
 import type { RackTarget } from '@shared/settings';
 import type { RackMixConfig } from '@shared/mixLayout';
 import { Logger } from '@main/logging/Logger';
-import { RackSession, connectErrorMessage, sameLevel } from '@main/rack/RackSession';
+import { RackSession, connectErrorMessage } from '@main/rack/RackSession';
+import { dbToLevel, levelToDb } from '@main/protocol/ilive-midi/codec';
 import { StateCache } from '@main/rack/StateCache';
 import { SIMULATOR_CAPABILITIES, SimulatedRack, SimulatorProtocol } from '@main/protocol/simulator/SimulatorProtocol';
 
@@ -22,6 +23,7 @@ function client(bus: number | null = 5) {
   const session: RackSession = new RackSession(cache, new Logger('error'), () => {
     const p = new SimulatorProtocol(rack, { meterFps: 0 });
     Object.defineProperty(p, 'capabilities', { value: { ...SIMULATOR_CAPABILITIES, stateQuery: 'partial' } });
+    Object.defineProperty(p, 'normaliseLevel', { value: (db: number) => levelToDb(dbToLevel(db)) }); // MIDI's rounding
     protocols.push(p);
     return p;
   }, { echoGuardMs: 50, bus: () => state.bus });
@@ -132,12 +134,19 @@ describe('RackSession over a protocol that cannot report state', () => {
     expect(c.session.current.unconfirmed).toContain('send:input:4>mix:5');
   });
 
-  it('sameLevel: within MIDI\'s rounding, and off is off', () => {
-    expect(sameLevel(-7.83, -8)).toBe(true);
-    expect(sameLevel(-7.83, -7.5)).toBe(true);
-    expect(sameLevel(-7.83, -9)).toBe(false);
-    expect(sameLevel(-Infinity, -95)).toBe(true);
-    expect(sameLevel(-Infinity, -60)).toBe(false);
+  it('a send pulled below the rack\'s quietest step echoes back as that step, and still counts as ours', async () => {
+    const c = client(5);
+    await online(c);
+    c.cache.apply([send(ip(6), 5, -70)]);
+    c.session.send([send(ip(6), 5, -70)]);
+    c.last().notify(send(ip(6), 5, levelToDb(1))); // the rack holds -53.5, its lowest level short of off
+    await vi.advanceTimersByTimeAsync(100);
+    expect(c.session.current.unconfirmed).not.toContain('send:input:6>mix:5');
+    c.session.send([send(ip(6), 5, -Infinity)]);
+    c.last().notify(send(ip(6), 5, -Infinity)); // off is off
+    c.last().notify(send(ip(6), 5, -52)); // a level we never sent, not a rounding of one: someone else
+    await vi.advanceTimersByTimeAsync(100);
+    expect(c.session.current.unconfirmed).toContain('send:input:6>mix:5');
   });
 
   it('refuses moves while still pulling from the rack', async () => {

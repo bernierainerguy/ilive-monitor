@@ -192,6 +192,31 @@ describe('the mix screen', () => {
     expect(sendLevel(be, 0, bus)).not.toBe(-40);
   });
 
+  it('clicking a "?" level to look, then away, sends nothing; it starts empty rather than showing the guess', async () => {
+    const { be } = await boot('/mix', { midiLike: true });
+    await connect(be);
+    await act(async () => void be.settings.update({ aux: 1 }));
+    const bus = aux(be, 1);
+    be.rack.state = { ...be.rack.state, inputs: be.rack.state.inputs.map((s, i) => (i === 5 ? { ...s, sends: { ...s.sends, [bus]: { ...s.sends[bus]!, levelDb: -12 } } } : s)) };
+    fireEvent.click(within(await screen.findByTestId('send-input:5')).getByRole('button', { name: /level$/ }));
+    const input = screen.getByRole('textbox');
+    expect(input).toHaveValue('');
+    fireEvent.blur(input);
+    await settle();
+    expect(sendLevel(be, 5, bus)).toBe(-12);
+  });
+
+  it('Connect on the rack already in use does not drop the link', async () => {
+    const { be } = await boot('/settings');
+    await connect(be);
+    const reconnect = vi.spyOn(be.session, 'connect');
+    await act(async () => void be.bridge.invoke('rack:connect', { targetId: SIM.id }));
+    expect(reconnect).not.toHaveBeenCalled();
+    fireEvent.click(await screen.findByRole('tab', { name: 'Rack' }));
+    fireEvent.click(screen.getByText('Sim'));
+    expect(screen.getByRole('button', { name: 'Connected to Sim' })).toBeDisabled();
+  });
+
   it('Escape in the level box cancels without sending', async () => {
     const { be } = await boot();
     await connect(be);

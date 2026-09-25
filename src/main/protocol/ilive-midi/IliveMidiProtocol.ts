@@ -25,6 +25,7 @@ import {
   encodeSetPad,
   encodeSetPhantom,
   encodeSocketGain,
+  dbToLevel,
   levelToDb,
   parseIliveSysex,
   stripToChannel,
@@ -163,6 +164,10 @@ export class IliveMidiProtocol implements MixRackProtocol {
   }
 
   // --- outbound ------------------------------------------------------------
+
+  normaliseLevel(db: number): number {
+    return levelToDb(dbToLevel(db));
+  }
 
   supports(c: MixerChange): boolean {
     switch (c.t) {

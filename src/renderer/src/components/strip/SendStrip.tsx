@@ -94,11 +94,14 @@ function LevelReadout({ name, db, unconfirmed, disabled, onCommit }: { name: str
     if (disabled) setEditing(false);
   }, [disabled]);
   if (editing && !disabled) {
+    // An unknown level starts empty, never pre-filled with the guess: only what's typed is ever sent.
+    const initial = unconfirmed ? '' : Number.isFinite(db) ? db.toFixed(1) : '-inf';
     return (
       <input
         autoFocus
         aria-label={`${name} level`}
-        defaultValue={Number.isFinite(db) ? db.toFixed(1) : '-inf'}
+        placeholder={unconfirmed ? 'dB' : undefined}
+        defaultValue={initial}
         onFocus={(e) => e.target.select()}
         onKeyDown={(e) => {
           if (e.key === 'Escape') {
@@ -108,7 +111,8 @@ function LevelReadout({ name, db, unconfirmed, disabled, onCommit }: { name: str
           if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
         }}
         onBlur={(e) => {
-          const v = cancelled.current ? null : parseLevel(e.target.value);
+          // Nothing typed (clicked in to look, then away): nothing sent.
+          const v = cancelled.current || e.target.value === initial ? null : parseLevel(e.target.value);
           if (v !== null) onCommit(v);
           setEditing(false);
         }}

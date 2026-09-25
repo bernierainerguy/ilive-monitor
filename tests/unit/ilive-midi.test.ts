@@ -134,6 +134,15 @@ describe('IliveMidiProtocol over loopback', () => {
     return { t, p };
   }
 
+  it('reports the level the rack will really hold: 0.5 dB steps, nothing quieter than its lowest step but off', () => {
+    const { p } = setup();
+    expect(p.normaliseLevel(-7.83)).toBe(-8);
+    expect(p.normaliseLevel(0)).toBe(0);
+    expect(p.normaliseLevel(10)).toBe(10);
+    expect(p.normaliseLevel(-70)).toBe(p.normaliseLevel(-53.5)); // below the lowest step: the lowest step, not off
+    expect(p.normaliseLevel(-Infinity)).toBe(-Infinity);
+  });
+
   it('opens by proving the rack answers', async () => {
     const { p } = setup();
     await expect(p.open()).resolves.toMatchObject({ name: 'FOH Rack', model: 'iDR48', ip: 'loopback' });

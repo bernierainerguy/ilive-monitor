@@ -37,6 +37,16 @@ export const Fader = memo(function Fader({ valueDb, onChange, height = 260, disa
   const [localPos, setLocalPos] = useState<number | null>(null);
   const pos = localPos ?? dbToFaderPos(valueDb);
   const travel = height - CAP_H;
+  // Where the finger and the cap are now, so a change of travel mid-drag can carry on from here.
+  const lastY = useRef(0);
+  const posNow = useRef(pos);
+  posNow.current = pos;
+  // The fader got taller or shorter under the finger (window resized, a banner came or went): re-anchor the
+  // drag where it is, or the whole move so far would be re-scaled onto the new travel and the level would jump.
+  useEffect(() => {
+    const d = drag.current;
+    if (d && !d.armed) drag.current = { ...d, startY: lastY.current, startPos: posNow.current };
+  }, [travel]);
 
   const emit = useCallback(
     (p: number) => {
@@ -69,6 +79,7 @@ export const Fader = memo(function Fader({ valueDb, onChange, height = 260, disa
       return;
     }
     e.currentTarget.setPointerCapture(e.pointerId);
+    lastY.current = e.clientY;
     const rect = track.current!.getBoundingClientRect();
     if (unconfirmed) {
       // A tap (to focus, or a brush in passing) must not overwrite the rack's real, unknown level: nothing is
@@ -87,6 +98,7 @@ export const Fader = memo(function Fader({ valueDb, onChange, height = 260, disa
   const onPointerMove = (e: PointerEvent<HTMLDivElement>) => {
     const d = drag.current;
     if (!d || d.id !== e.pointerId) return;
+    lastY.current = e.clientY;
     if (disabled) {
       drag.current = null; // locked under the finger (the rack dropped): stop sending
       return;

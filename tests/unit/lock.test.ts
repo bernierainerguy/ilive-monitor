@@ -143,6 +143,19 @@ describe('LockService', () => {
     expect(relaunched.unlock('third').unlocked).toBe(true);
   });
 
+  it('a password whose file can\'t be removed stays, rather than coming back at the next launch', async () => {
+    const sub = join(dir, 'locked-dir2');
+    mkdirSync(sub);
+    const file = join(sub, 'settings-lock.json');
+    const s = new LockService(file, new Logger('error'));
+    await s.init();
+    await s.setPassword('keep');
+    chmodSync(sub, 0o500);
+    await expect(s.setPassword(null)).rejects.toThrow();
+    expect(s.status.hasPassword).toBe(true);
+    chmodSync(sub, 0o700);
+  });
+
   it('locks itself after 10 minutes unlocked', async () => {
     vi.useFakeTimers();
     const s = await service();

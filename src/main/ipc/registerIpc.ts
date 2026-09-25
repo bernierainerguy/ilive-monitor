@@ -61,6 +61,8 @@ export function registerIpc(d: IpcDeps) {
     unlocked();
     const t = d.settings.current.racks.find((c) => c.id === targetId);
     if (!t) throw new Error('Unknown rack');
+    // A reconnect would mark every send unknown again over MIDI: never do it just because Connect was pressed twice.
+    if (d.session.isConnectedTo(t.id)) return;
     d.session.connect(t);
   });
   handle('rack:disconnect', () => {

@@ -9,6 +9,8 @@ Add entries under **Unreleased** as you go; `npm run release:minor|patch|major` 
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-09-25
+
 ### Changed
 - The faders no longer scroll sideways. The inputs come in banks sized to fit the window (32, 16, 8 or 4
   channels), and the bank keys (Ch 1–16, Ch 17–32…) choose which one is on the faders. Strips widen to fill the
@@ -33,5 +35,6 @@ Add entries under **Unreleased** as you go; `npm run release:minor|patch|major` 
   - Licence registration and check-in, EULA and privacy notice, and update checks against
     whiteleyevents.co.uk (product `weim`).
 
-[Unreleased]: https://github.com/bernierainerguy/ilive-monitor/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/bernierainerguy/ilive-monitor/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/bernierainerguy/ilive-monitor/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/bernierainerguy/ilive-monitor/releases/tag/v0.1.0

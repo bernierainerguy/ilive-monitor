@@ -9,6 +9,8 @@ Add entries under **Unreleased** as you go; `npm run release:minor|patch|major` 
 
 ## [Unreleased]
 
+## [0.4.1] - 2026-09-25
+
 ### Fixed
 - A send pulled below about -53 dB was ghosted after every move. That's the rack's quietest step short of off, so
   its echo came back as -53 and looked like someone else's move. Echoes are now compared in the rack's own
@@ -117,7 +119,8 @@ Add entries under **Unreleased** as you go; `npm run release:minor|patch|major` 
   - Licence registration and check-in, EULA and privacy notice, and update checks against
     whiteleyevents.co.uk (product `weim`).
 
-[Unreleased]: https://github.com/bernierainerguy/ilive-monitor/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/bernierainerguy/ilive-monitor/compare/v0.4.1...HEAD
+[0.4.1]: https://github.com/bernierainerguy/ilive-monitor/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/bernierainerguy/ilive-monitor/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/bernierainerguy/ilive-monitor/compare/v0.2.1...v0.3.0
 [0.2.1]: https://github.com/bernierainerguy/ilive-monitor/compare/v0.2.0...v0.2.1

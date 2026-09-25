@@ -9,6 +9,8 @@ Add entries under **Unreleased** as you go; `npm run release:minor|patch|major` 
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-09-25
+
 ### Added
 - Settings password. Once one is set, Settings shows an unlock prompt, and the main process refuses every
   Settings change while locked: the mix, racks, connect and disconnect, theme, the password itself and the licence
@@ -79,7 +81,8 @@ Add entries under **Unreleased** as you go; `npm run release:minor|patch|major` 
   - Licence registration and check-in, EULA and privacy notice, and update checks against
     whiteleyevents.co.uk (product `weim`).
 
-[Unreleased]: https://github.com/bernierainerguy/ilive-monitor/compare/v0.2.1...HEAD
+[Unreleased]: https://github.com/bernierainerguy/ilive-monitor/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/bernierainerguy/ilive-monitor/compare/v0.2.1...v0.3.0
 [0.2.1]: https://github.com/bernierainerguy/ilive-monitor/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/bernierainerguy/ilive-monitor/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/bernierainerguy/ilive-monitor/releases/tag/v0.1.0

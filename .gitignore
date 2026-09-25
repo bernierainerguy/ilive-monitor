@@ -1,0 +1,19 @@
+node_modules/
+out/
+release/
+coverage/
+test-results/
+playwright-report/
+.DS_Store
+*.tsbuildinfo
+
+# Vite / electron-vite write these next to their config while loading it
+*.timestamp-*.mjs
+electron.vite.config.*.mjs
+
+# Website upload credentials (WELM_APP_USER / WELM_APP_PASSWORD)
+.env
+.ilive-monitor-release.lock/
+
+# Built from legal/*.md by scripts/build-legal-pdfs.py during a release
+legal/*.pdf

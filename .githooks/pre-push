@@ -1,0 +1,6 @@
+#!/bin/sh
+# Runs the same checks as GitHub Actions before every push.
+# Skip once (e.g. docs-only push) with:  git push --no-verify
+set -e
+echo "pre-push: running 'npm run ci' (typecheck, tests + coverage, build, e2e)…"
+npm run ci

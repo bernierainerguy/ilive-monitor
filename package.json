@@ -1,0 +1,61 @@
+{
+  "name": "ilive-monitor",
+  "productName": "iLive Monitor",
+  "version": "0.1.0",
+  "description": "Monitor-only send control for the Allen & Heath iDR48 MixRack: send levels to one aux, nothing else",
+  "private": true,
+  "main": "out/main/index.js",
+  "author": "Whiteley Events",
+  "license": "UNLICENSED",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "dev": "electron-vite dev",
+    "build": "electron-vite build",
+    "preview": "electron-vite preview",
+    "typecheck": "tsc -p tsconfig.node.json --noEmit && tsc -p tsconfig.web.json --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "test:e2e": "npm run build && playwright test",
+    "test:ci": "vitest run --coverage --coverage.reporter=text-summary --coverage.reporter=lcov",
+    "ci": "npm run typecheck && npm run test:ci && npm run build && playwright test",
+    "prepare": "git config core.hooksPath .githooks || true",
+    "icon": "electron scripts/make-icon.cjs",
+    "install:local": "sh scripts/install-local.sh",
+    "preversion": "npm run ci",
+    "version": "node scripts/changelog.cjs && git add CHANGELOG.md",
+    "release:patch": "npm version patch -m \"Release v%s\"",
+    "release:minor": "npm version minor -m \"Release v%s\"",
+    "release:major": "npm version major -m \"Release v%s\"",
+    "release:site": "bash scripts/release-site.sh"
+  },
+  "dependencies": {
+    "@emotion/react": "^11.13.3",
+    "@emotion/styled": "^11.13.0",
+    "@mui/icons-material": "^6.1.6",
+    "@mui/material": "^6.1.6",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-router-dom": "^6.28.0",
+    "zustand": "^5.0.1"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.48.2",
+    "@testing-library/jest-dom": "^6.6.3",
+    "@testing-library/react": "^16.0.1",
+    "@types/node": "^20.17.6",
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "@vitejs/plugin-react": "^4.3.3",
+    "@vitest/coverage-v8": "^2.1.5",
+    "electron": "^33.2.0",
+    "electron-builder": "^25.1.8",
+    "electron-vite": "^2.3.0",
+    "jsdom": "^25.0.1",
+    "typescript": "^5.6.3",
+    "vite": "^5.4.11",
+    "vitest": "^2.1.5"
+  }
+}

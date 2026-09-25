@@ -1,0 +1,66 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+# Same commands as `npm run ci`, split into steps for readable logs. Keep them in sync.
+jobs:
+  check:
+    name: Typecheck & tests
+    # macOS: the product only ships on macOS, and Electron e2e needs a real display.
+    runs-on: macos-14
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Unit, integration & UI tests (80% coverage gate)
+        run: npm run test:ci
+
+      - name: Build
+        run: npm run build
+
+      # Playwright drives the built Electron app directly; no browser download needed.
+      - name: End-to-end (Electron)
+        run: npx playwright test
+
+      # Uploads are diagnostics: they must never fail the build (e.g. account storage quota).
+      - name: Upload coverage (lcov)
+        if: always()
+        continue-on-error: true
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-lcov
+          path: coverage/lcov.info
+          if-no-files-found: ignore
+          retention-days: 7
+
+      - name: Upload e2e results (screenshots, traces)
+        if: failure()
+        continue-on-error: true
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-results
+          path: test-results/
+          if-no-files-found: ignore
+          retention-days: 7

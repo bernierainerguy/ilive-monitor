@@ -31,9 +31,10 @@ test('first launch → simulator → choose a mix → move a send; the mix is ke
   await expect(page.getByRole('heading', { name: 'Choose your mix' })).toBeVisible({ timeout: 3000 });
 
   await page.getByRole('button', { name: 'Open Settings' }).click();
-  await page.getByText('iDR48 Simulator').click();
-  await page.getByRole('button', { name: /^Connect to/ }).click();
+  await page.getByRole('tab', { name: 'Rack' }).click();
+  await page.getByRole('button', { name: 'Connect to iDR48 Simulator' }).click(); // pre-selected
   await expect(page.getByRole('button', { name: /^Rack: iDR48 Simulator, online/ })).toBeVisible();
+  await page.getByRole('tab', { name: 'Mix bus' }).click();
   await page.getByRole('radiogroup', { name: 'Mix bus' }).getByRole('radio').nth(1).click();
   await page.getByRole('button', { name: 'Mix', exact: true }).click();
   await expect(page.getByLabel(/^Mix: Aux 2/)).toBeVisible();

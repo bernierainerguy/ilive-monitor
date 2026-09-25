@@ -9,6 +9,8 @@ Add entries under **Unreleased** as you go; `npm run release:minor|patch|major` 
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-09-25
+
 ### Changed
 - Settings has a sidebar (Mix bus, Rack, Password, Appearance, Licence, About) and shows one section at a time.
   Before, the Password section was below the bottom of the window and easy to miss.
@@ -100,7 +102,8 @@ Add entries under **Unreleased** as you go; `npm run release:minor|patch|major` 
   - Licence registration and check-in, EULA and privacy notice, and update checks against
     whiteleyevents.co.uk (product `weim`).
 
-[Unreleased]: https://github.com/bernierainerguy/ilive-monitor/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/bernierainerguy/ilive-monitor/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/bernierainerguy/ilive-monitor/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/bernierainerguy/ilive-monitor/compare/v0.2.1...v0.3.0
 [0.2.1]: https://github.com/bernierainerguy/ilive-monitor/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/bernierainerguy/ilive-monitor/compare/v0.1.0...v0.2.0

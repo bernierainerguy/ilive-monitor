@@ -81,42 +81,79 @@ function UnlockPanel({ lock }: { lock: LockStatus }) {
   );
 }
 
-/** The mix bus this Mac adjusts, the rack, appearance, password, licence and version. All kept between launches. */
+type Section = 'mix' | 'rack' | 'password' | 'appearance' | 'licence' | 'about';
+const SECTIONS: ReadonlyArray<{ id: Section; label: string }> = [
+  { id: 'mix', label: 'Mix bus' },
+  { id: 'rack', label: 'Rack' },
+  { id: 'password', label: 'Password' },
+  { id: 'appearance', label: 'Appearance' },
+  { id: 'licence', label: 'Licence' },
+  { id: 'about', label: 'About' },
+];
+
+/**
+ * The mix bus this Mac adjusts, the rack, password, appearance, licence and version. All kept between launches.
+ * A sidebar shows one section at a time, so nothing hides below the fold.
+ */
 function SettingsPage() {
   const t = useTokens();
+  const [section, setSection] = useState<Section>('mix');
+  return (
+    <Box sx={{ height: '100%', display: 'flex', minHeight: 0 }}>
+      <Box
+        role="tablist"
+        aria-label="Settings"
+        aria-orientation="vertical"
+        sx={{ width: 190, flexShrink: 0, p: 1.5, display: 'flex', flexDirection: 'column', gap: '4px', borderRight: `1px solid ${t.colours.border}`, bgcolor: t.colours.surface }}
+      >
+        {SECTIONS.map((x) => {
+          const on = x.id === section;
+          return (
+            <ButtonBase
+              key={x.id}
+              role="tab"
+              aria-selected={on}
+              onClick={() => setSection(x.id)}
+              sx={{
+                justifyContent: 'flex-start', height: 40, px: 1.5, borderRadius: '8px', fontSize: 14, fontWeight: 700,
+                color: on ? plateInk(t.colours.accent, t) : t.colours.textMuted, bgcolor: on ? t.colours.accent : 'transparent',
+                '&:hover': { color: on ? plateInk(t.colours.accent, t) : t.colours.text, bgcolor: on ? t.colours.accent : t.colours.surfaceRaised },
+              }}
+            >
+              {x.label}
+            </ButtonBase>
+          );
+        })}
+      </Box>
+      {/* Every section stays mounted (only one shows), so a half-typed rack or password survives a look elsewhere. */}
+      {SECTIONS.map((x) => (
+        <Box key={x.id} role="tabpanel" aria-label={x.label} hidden={x.id !== section} sx={{ flex: 1, minWidth: 0, overflow: 'auto', p: 2.5 }}>
+          <Box sx={{ maxWidth: 1100 }}>
+            <Caption>{x.label}</Caption>
+            {x.id === 'mix' && <BusPicker />}
+            {x.id === 'rack' && <RackSettings />}
+            {x.id === 'password' && <PasswordSection />}
+            {x.id === 'appearance' && <Appearance />}
+            {x.id === 'licence' && <Licence />}
+            {x.id === 'about' && (
+              <>
+                <Typography variant="body2" sx={{ fontFamily: t.fonts.mono }}>iLive Monitor {BUILD.version} ({BUILD.commit})</Typography>
+                <UpdateSection />
+              </>
+            )}
+          </Box>
+        </Box>
+      ))}
+    </Box>
+  );
+}
+
+function Appearance() {
   const themeId = useAppStore((s) => s.settings?.themeId ?? 'dark');
   return (
-    <Box sx={{ height: '100%', overflow: 'auto', p: 2.5 }}>
-      <Stack spacing={4} sx={{ maxWidth: 1100 }}>
-        <Box component="section" aria-label="Mix bus">
-          <Caption>Mix bus</Caption>
-          <BusPicker />
-        </Box>
-        <Box component="section" aria-label="Rack">
-          <Caption>Rack</Caption>
-          <RackSettings />
-        </Box>
-        <Box component="section" aria-label="Appearance">
-          <Caption>Appearance</Caption>
-          <ToggleButtonGroup size="small" exclusive value={themeId} onChange={(_, v) => v && void update({ themeId: v })} aria-label="Theme">
-            {BUILTIN_THEMES.map((th) => <ToggleButton key={th.id} value={th.id}>{th.name}</ToggleButton>)}
-          </ToggleButtonGroup>
-        </Box>
-        <Box component="section" aria-label="Password">
-          <Caption>Password</Caption>
-          <PasswordSection />
-        </Box>
-        <Box component="section" aria-label="Licence">
-          <Caption>Licence</Caption>
-          <Licence />
-        </Box>
-        <Box component="section" aria-label="About">
-          <Caption>About</Caption>
-          <Typography variant="body2" sx={{ fontFamily: t.fonts.mono }}>iLive Monitor {BUILD.version} ({BUILD.commit})</Typography>
-          <UpdateSection />
-        </Box>
-      </Stack>
-    </Box>
+    <ToggleButtonGroup size="small" exclusive value={themeId} onChange={(_, v) => v && void update({ themeId: v })} aria-label="Theme">
+      {BUILTIN_THEMES.map((th) => <ToggleButton key={th.id} value={th.id}>{th.name}</ToggleButton>)}
+    </ToggleButtonGroup>
   );
 }
 
@@ -135,7 +172,7 @@ function BusPicker() {
         {!live && ' Connect to the rack to see its auxes with their names and in the rack’s layout.'}
       </Typography>
       {auxes.length === 0 ? (
-        <Typography variant="body2">This rack has no auxes. Check the mix configuration below.</Typography>
+        <Typography variant="body2">This rack has no auxes. Check its mix configuration under Rack.</Typography>
       ) : (
         <Box role="radiogroup" aria-label="Mix bus" sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, 112px)', gap: '8px' }}>
           {auxes.map((m, i) => {

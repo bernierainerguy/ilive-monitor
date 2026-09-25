@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { existsSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -122,6 +122,25 @@ describe('LockService', () => {
     s.unlock('right'); // queues another
     await s.setPassword(null);
     expect(existsSync(path)).toBe(false);
+  });
+
+  it('one failed save doesn\'t stop later ones, and a password that can\'t be saved isn\'t set', async () => {
+    const sub = join(dir, 'locked-dir');
+    mkdirSync(sub);
+    const file = join(sub, 'settings-lock.json');
+    const s = new LockService(file, new Logger('error'));
+    await s.init();
+    await s.setPassword('first');
+    chmodSync(sub, 0o500); // disk refuses writes
+    await expect(s.setPassword('second')).rejects.toThrow();
+    s.lock();
+    expect(() => s.unlock('second')).toThrow('Wrong password'); // still the old one
+    chmodSync(sub, 0o700); // disk back
+    s.unlock('first');
+    await s.setPassword('third');
+    const relaunched = new LockService(file, new Logger('error'));
+    await relaunched.init();
+    expect(relaunched.unlock('third').unlocked).toBe(true);
   });
 
   it('locks itself after 10 minutes unlocked', async () => {

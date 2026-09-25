@@ -161,6 +161,7 @@ async function bootstrap() {
         offLastTarget(); // quitting disconnects, but the rack should still reconnect at the next launch
         await settings.flush();
         await lock.flush();
+        await rack.drain(); // the last move before quitting still reaches the rack
         rack.dispose();
         licence.stop();
         updates.stop();

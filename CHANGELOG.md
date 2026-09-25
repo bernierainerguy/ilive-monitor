@@ -9,6 +9,25 @@ Add entries under **Unreleased** as you go; `npm run release:minor|patch|major` 
 
 ## [Unreleased]
 
+### Changed
+- Settings has a sidebar (Mix bus, Rack, Password, Appearance, Licence, About) and shows one section at a time.
+  Before, the Password section was below the bottom of the window and easy to miss.
+- The Rack section starts with the rack in use, or the first saved one, selected, so Connect is ready to press.
+- An update check before iLive Monitor is on the website says "no release of iLive Monitor is on
+  whiteleyevents.co.uk yet", instead of the server's 404.
+
+### Fixed
+- Moving a fader no longer leaves its send ghosted ("?"). The check that tells the rack's echo of your move from
+  someone else's move compared levels exactly, but iLive MIDI rounds to 0.5 dB, so nearly every drag on real
+  hardware was marked unknown. Echoes of any level sent in the last 200 ms, allowing for the rounding, now count
+  as yours. Only a level you didn't send marks the send unknown.
+- A tap on a ghosted fader no longer changes the send: nothing is sent until the finger moves, and then the level
+  is where the finger is. ↑/↓ on a ghosted fader no longer scrolls the page.
+- One failed write of the Settings lock (a full disk, say) no longer stops every later one. A new password is only
+  used once it's saved, so it can't vanish at the next launch.
+- A half-typed rack or password in Settings survives a look at another section.
+- The last move before quitting is given time to reach the rack.
+
 ## [0.3.0] - 2026-09-25
 
 ### Added

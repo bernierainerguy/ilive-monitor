@@ -1,4 +1,5 @@
-import { coalesceKey, getStrip, type MixerChange } from '@shared/domain/changes';
+import { coalesceKey, type MixerChange } from '@shared/domain/changes';
+import { FADER_MIN_DB } from '@shared/domain/units';
 import { isMonitorBus, monitorSources } from '@shared/monitorPolicy';
 import {
   MAX_MISSED_PROBES,
@@ -65,6 +66,8 @@ export class RackSession {
   private tracking = false;
   private unconfirmedTimer: ReturnType<typeof setTimeout> | null = null;
   private recentOutbound = new Map<string, number>();
+  /** Send levels we sent inside the echo-guard window, per control: an echo of any of them is ours. */
+  private recentLevels = new Map<string, number[]>();
   private rttSamples: number[] = [];
   private everConnected = false;
   private generation = 0;
@@ -150,7 +153,12 @@ export class RackSession {
         if (!this.outbound.has(key)) this.outboundOrdered.push(c);
         else this.outboundOrdered[this.outboundOrdered.indexOf(this.outbound.get(key)!)] = c;
         this.outbound.set(key, c);
-        this.recentOutbound.set(key, Date.now());
+        const now = Date.now();
+        if (c.t === 'send' && c.patch.levelDb !== undefined) {
+          const fresh = (this.recentOutbound.get(key) ?? 0) > now - this.o.echoGuardMs;
+          this.recentLevels.set(key, [...(fresh ? (this.recentLevels.get(key) ?? []).slice(-63) : []), c.patch.levelDb]);
+        }
+        this.recentOutbound.set(key, now);
       } else {
         this.outboundOrdered.push(c);
       }
@@ -161,8 +169,14 @@ export class RackSession {
     return { sent, unsupported };
   }
 
+  /** Send anything still queued now, and give the socket a moment to write it (quitting). */
+  async drain(ms = 50): Promise<void> {
+    if (!this.protocol || !this.isLive) return;
+    this.flushOutbound();
+    await new Promise((r) => setTimeout(r, ms));
+  }
+
   dispose(): void {
-    if (this.protocol && this.isLive) this.flushOutbound(); // the last move before quitting still goes out
     this.disconnect();
     this.status.clear();
     this.meters.clear();
@@ -248,9 +262,9 @@ export class RackSession {
     if (key) {
       const sentAt = this.recentOutbound.get(key);
       if (sentAt !== undefined && Date.now() - sentAt < this.o.echoGuardMs) {
-        // Ignored as a stale echo of our own move. If it matches what we have, the rack agrees. If not, it may be
-        // an older step of our drag, or someone else moving it at the same moment: we can't tell, so say so.
-        if (this.matchesCache(c)) this.confirm(c);
+        // Inside the echo guard: an echo of a level we just sent (the final one or a step of the drag) is ours.
+        // Anything else is someone else moving it at the same moment: we can't tell who won, so say so.
+        if (this.isOurEcho(key, c)) this.confirm(c);
         else this.unconfirm(c);
         return;
       }
@@ -278,7 +292,10 @@ export class RackSession {
     // bound memory of the echo guard
     if (this.recentOutbound.size > 512) {
       const cutoff = Date.now() - this.o.echoGuardMs;
-      for (const [k, t] of this.recentOutbound) if (t < cutoff) this.recentOutbound.delete(k);
+      for (const [k, t] of this.recentOutbound) if (t < cutoff) {
+        this.recentOutbound.delete(k);
+        this.recentLevels.delete(k);
+      }
     }
   }
 
@@ -386,11 +403,10 @@ export class RackSession {
     if (this.confirmed.delete(unconfirmedSendKey(c.strip, c.target.index)) && c.target.index === this.bus()) this.publishUnconfirmed(false);
   }
 
-  private matchesCache(c: MixerChange): boolean {
-    if (c.t !== 'send' || c.target.kind !== 'mix' || c.patch.levelDb === undefined) return true;
-    const s = getStrip(this.cache.state, c.strip);
-    const level = s && 'sends' in s ? (s.sends as Record<number, { levelDb: number }>)[c.target.index]?.levelDb : undefined;
-    return level === c.patch.levelDb;
+  private isOurEcho(key: string, c: MixerChange): boolean {
+    if (c.t !== 'send' || c.patch.levelDb === undefined) return true;
+    const heard = c.patch.levelDb;
+    return (this.recentLevels.get(key) ?? []).some((sent) => sameLevel(sent, heard));
   }
 
   /** The bus in Settings changed: report what's unconfirmed on the new one. */
@@ -427,6 +443,16 @@ export class RackSession {
  * that hasn't been given Local Network access with EHOSTUNREACH, even when the
  * rack answers ping and other apps, so that case names the setting.
  */
+/**
+ * Two send levels the rack can't tell apart. iLive MIDI carries levels in 0.5 dB steps, so an echo of -7.83 comes
+ * back as -8. Anything at or below the fader's floor is off.
+ */
+export function sameLevel(a: number, b: number): boolean {
+  const off = (v: number) => v <= FADER_MIN_DB;
+  if (off(a) || off(b)) return off(a) && off(b);
+  return Math.abs(a - b) <= 0.5;
+}
+
 export function connectErrorMessage(err: unknown, target: Pick<RackTarget, 'host' | 'port'>): string {
   const code = (err as { code?: string } | null)?.code;
   const where = `${target.host}:${target.port}`;

@@ -96,7 +96,8 @@ describe('Settings password', () => {
 
   it('sets, changes and removes the password from Settings', async () => {
     const { lock } = await boot(null);
-    const section = within(await screen.findByRole('region', { name: 'Password' }));
+    fireEvent.click(await screen.findByRole('tab', { name: 'Password' }));
+    const section = within(await screen.findByRole('tabpanel', { name: 'Password' }));
     expect(section.getByText(/Anyone can open Settings/)).toBeInTheDocument();
     fireEvent.change(section.getByLabelText('Password'), { target: { value: 'ab' } });
     fireEvent.click(section.getByRole('button', { name: 'Set password' }));
@@ -122,9 +123,22 @@ describe('Settings password', () => {
     await waitFor(() => expect(lock.status.hasPassword).toBe(false));
   });
 
+  it('a half-typed rack survives a look at another section', async () => {
+    await boot(null);
+    fireEvent.click(await screen.findByRole('tab', { name: 'Rack' }));
+    const ip = await screen.findByLabelText('IP address').catch(() => null);
+    fireEvent.click(screen.getByRole('button', { name: 'Add rack' }));
+    fireEvent.change(await screen.findByLabelText('IP address'), { target: { value: '10.1.2.3' } });
+    fireEvent.click(screen.getByRole('tab', { name: 'Mix bus' }));
+    fireEvent.click(screen.getByRole('tab', { name: 'Rack' }));
+    expect(screen.getByLabelText('IP address')).toHaveValue('10.1.2.3');
+    expect(ip).toBeNull(); // the built-in simulator was pre-selected: it has no address field
+  });
+
   it('Lock now locks straight away', async () => {
     const { lock } = await boot(null);
     await act(async () => void (await lock.setPassword('abcd')));
+    fireEvent.click(await screen.findByRole('tab', { name: 'Password' }));
     fireEvent.click(await screen.findByRole('button', { name: 'Lock now' }));
     expect(await screen.findByRole('heading', { name: 'Settings are locked' })).toBeInTheDocument();
   });

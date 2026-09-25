@@ -16,7 +16,8 @@ export function RackSettings() {
   const rack = useAppStore((s) => s.rack);
   const targets = useAppStore((s) => s.settings?.racks ?? EMPTY);
   const notify = useAppStore((s) => s.notify);
-  const [editing, setEditing] = useState<RackTarget | null>(null);
+  // Start on the rack in use, else the first saved one, so Connect is ready to press.
+  const [editing, setEditing] = useState<RackTarget | null>(() => targets.find((x) => x.id === rack.targetId) ?? targets[0] ?? null);
   // A refused save (a bad port, or Settings locked meanwhile) says why instead of failing silently.
   const attempt = (fn: () => Promise<unknown>) =>
     fn().catch((e: Error) => notify(e.message.replace(/^Error invoking remote method '[^']+': (Error: )?/, ''), 'error'));

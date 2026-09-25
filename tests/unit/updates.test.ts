@@ -126,7 +126,9 @@ describe('UpdateService', () => {
     res = () => json({}, 503);
     expect(await svc.check()).toMatchObject({ status: 'up-to-date', checkError: 'update server replied 503', error: null, dialog: 'manual' });
     res = () => json({ success: false, data: { error: 'Unknown product or no installers available.' } }, 404); // the live reply before the first upload
-    expect((await svc.check()).checkError).toBe('update server replied 404: Unknown product or no installers available.');
+    expect((await svc.check()).checkError).toBe('no release of iLive Monitor is on whiteleyevents.co.uk yet');
+    res = () => json({ success: false, data: { error: 'Rate limited' } }, 429); // other refusals keep the server's reason
+    expect((await svc.check()).checkError).toBe('update server replied 429: Rate limited');
     res = () => new Response('<html>', { status: 200 });
     expect((await svc.check()).checkError).toBe('update server sent an unreadable reply');
     res = () => json({ success: true, data: {} });

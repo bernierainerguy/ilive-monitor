@@ -44,12 +44,14 @@ describe('first launch', () => {
 
   it('a rack added in Settings connects, and choosing a mix opens its sends on the faders', async () => {
     const { be } = await boot('/settings');
+    fireEvent.click(await screen.findByRole('tab', { name: 'Rack' }));
     fireEvent.click(await screen.findByRole('button', { name: 'Add rack' }));
     fireEvent.mouseDown(screen.getByRole('combobox'));
     fireEvent.click(within(await screen.findByRole('listbox')).getByRole('option', { name: 'Simulator' }));
     fireEvent.click(screen.getByRole('button', { name: /^Connect to/ }));
     await waitFor(() => expect(be.session.current.phase).toBe('online'));
     expect(be.settings.current.racks).toHaveLength(2); // the built-in simulator and the new one
+    fireEvent.click(screen.getByRole('tab', { name: 'Mix bus' }));
 
     const picker = screen.getByRole('radiogroup', { name: 'Mix bus' });
     const radios = within(picker).getAllByRole('radio');
@@ -169,6 +171,25 @@ describe('the mix screen', () => {
     fireEvent.keyDown(fader, { key: 'ArrowDown' }); // now confirmed (we set it): nudges work again
     await settle();
     expect(sendLevel(be, 0, bus)).toBe(-1);
+  });
+
+  it('a tap on a ghosted fader sends nothing; a real move sets the level where the finger is', async () => {
+    const { be } = await boot('/mix', { midiLike: true });
+    await connect(be);
+    await act(async () => void be.settings.update({ aux: 1 }));
+    const bus = aux(be, 1);
+    be.rack.state = { ...be.rack.state, inputs: be.rack.state.inputs.map((s, i) => (i === 0 ? { ...s, sends: { ...s.sends, [bus]: { ...s.sends[bus]!, levelDb: -40 } } } : s)) };
+    const fader = within(await screen.findByTestId('send-input:0')).getByRole('slider');
+    fireEvent.pointerDown(fader, { pointerId: 1, button: 0, clientY: 100 });
+    fireEvent.pointerMove(fader, { pointerId: 1, clientY: 102 }); // a wobble, not a move
+    fireEvent.pointerUp(fader, { pointerId: 1, clientY: 102 });
+    await settle();
+    expect(sendLevel(be, 0, bus)).toBe(-40);
+    fireEvent.pointerDown(fader, { pointerId: 2, button: 0, clientY: 100 });
+    fireEvent.pointerMove(fader, { pointerId: 2, clientY: 60 });
+    fireEvent.pointerUp(fader, { pointerId: 2, clientY: 60 });
+    await settle();
+    expect(sendLevel(be, 0, bus)).not.toBe(-40);
   });
 
   it('Escape in the level box cancels without sending', async () => {

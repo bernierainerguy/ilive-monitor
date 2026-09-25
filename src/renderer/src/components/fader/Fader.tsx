@@ -20,6 +20,8 @@ export const FADER_WIDTH = 50;
 const RAIL_X = 32; // rail centre
 const CAP_W = 30;
 const FINE = 0.15;
+/** How far a finger must move on an unconfirmed fader before it counts as a move, not a tap. */
+const ARM_PX = 4;
 
 /**
  * Vertical fader. While the operator holds it, the fader owns its value and
@@ -30,7 +32,8 @@ const FINE = 0.15;
 export const Fader = memo(function Fader({ valueDb, onChange, height = 260, disabled, label, accent, unconfirmed }: FaderProps) {
   const t = useTokens();
   const track = useRef<HTMLDivElement>(null);
-  const drag = useRef<{ startY: number; startPos: number; id: number } | null>(null);
+  /** `armed`: an unconfirmed fader was touched but hasn't moved yet, so nothing has been sent. */
+  const drag = useRef<{ startY: number; startPos: number; id: number; armed?: boolean } | null>(null);
   const [localPos, setLocalPos] = useState<number | null>(null);
   const pos = localPos ?? dbToFaderPos(valueDb);
   const travel = height - CAP_H;
@@ -67,10 +70,14 @@ export const Fader = memo(function Fader({ valueDb, onChange, height = 260, disa
     }
     e.currentTarget.setPointerCapture(e.pointerId);
     const rect = track.current!.getBoundingClientRect();
+    if (unconfirmed) {
+      // A tap (to focus, or a brush in passing) must not overwrite the rack's real, unknown level: nothing is
+      // sent until the finger moves, and then the level is where the finger is, not relative to the guess.
+      drag.current = { startY: e.clientY, startPos: 0, id: e.pointerId, armed: true };
+      return;
+    }
     const capTop = rect.top + (1 - pos) * travel;
-    // An unconfirmed level is a guess: moving relative to it could jump the real send by any amount. So the
-    // touch always sets the level where the finger is, as on the track, and the drag carries on from there.
-    const onCap = !unconfirmed && e.clientY >= capTop && e.clientY <= capTop + CAP_H;
+    const onCap = e.clientY >= capTop && e.clientY <= capTop + CAP_H;
     // Click on the cap grabs relatively (no jump); click on the track jumps there first.
     const startPos = onCap ? pos : clamp(1 - (e.clientY - rect.top - CAP_H / 2) / travel, 0, 1);
     if (!onCap) emit(startPos);
@@ -82,6 +89,14 @@ export const Fader = memo(function Fader({ valueDb, onChange, height = 260, disa
     if (!d || d.id !== e.pointerId) return;
     if (disabled) {
       drag.current = null; // locked under the finger (the rack dropped): stop sending
+      return;
+    }
+    if (d.armed) {
+      if (Math.abs(e.clientY - d.startY) < ARM_PX) return;
+      const rect = track.current!.getBoundingClientRect();
+      const at = clamp(1 - (e.clientY - rect.top - CAP_H / 2) / travel, 0, 1);
+      drag.current = { startY: e.clientY, startPos: at, id: d.id };
+      emit(at);
       return;
     }
     const scale = e.shiftKey ? FINE : 1;
@@ -105,9 +120,14 @@ export const Fader = memo(function Fader({ valueDb, onChange, height = 260, disa
     if (disabled) return;
     const step = e.shiftKey ? 0.1 : 1;
     let next: number | null = null;
-    // Nudges are relative, so not from a guessed level. Home (0 dB) and End (off) are absolute.
-    if (e.key === 'ArrowUp' && !unconfirmed) next = nudgeFaderDb(valueDb, step);
-    else if (e.key === 'ArrowDown' && !unconfirmed) next = nudgeFaderDb(valueDb, -step);
+    // Nudges are relative, so not from a guessed level (the key still doesn't scroll the page). Home (0 dB) and
+    // End (off) are absolute.
+    if (unconfirmed && (e.key === 'ArrowUp' || e.key === 'ArrowDown')) {
+      e.preventDefault();
+      return;
+    }
+    if (e.key === 'ArrowUp') next = nudgeFaderDb(valueDb, step);
+    else if (e.key === 'ArrowDown') next = nudgeFaderDb(valueDb, -step);
     else if (e.key === 'Home') next = 0;
     else if (e.key === 'End') next = -Infinity;
     if (next === null) return;

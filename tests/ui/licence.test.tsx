@@ -142,6 +142,7 @@ describe('Settings → Licence', () => {
   it('shows the details, checks in, edits registration and opens the documents', async () => {
     const ok = registered({ status: 'granted', lastCheckinAt: new Date().toISOString(), graceUntil: new Date(Date.now() + GRACE_MS).toISOString() });
     await boot({ state: ok, path: '/settings' });
+    fireEvent.click(await screen.findByRole('tab', { name: 'Licence' }));
     expect(await screen.findByTestId('licence-status')).toHaveTextContent('Licensed. Check-in valid for 30 more days.');
     expect(screen.getByText('abcdef12')).toBeInTheDocument();
     expect(screen.getByText(new RegExp(`Version ${EULA_VERSION}, accepted`))).toBeInTheDocument();
@@ -205,6 +206,7 @@ describe('window start-up', () => {
 it('without licence services (tests, dev hosts) nothing is gated', async () => {
   const app = await bootApp('/settings');
   stop = app.stop;
+  fireEvent.click(await screen.findByRole('tab', { name: 'Licence' }));
   expect(await screen.findByTestId('licence-status')).toHaveTextContent('Licensed');
   expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
 });

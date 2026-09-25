@@ -105,10 +105,12 @@ export class LockService {
       this.log.info('user', 'Settings password removed');
     } else {
       if (typeof next !== 'string' || next.length < MIN_PASSWORD_LENGTH) throw new Error(`Use at least ${MIN_PASSWORD_LENGTH} characters.`);
-      this.hash = hashPassword(next);
+      // On disk first: if it can't be saved, keep the old password rather than one that vanishes at relaunch.
+      const hash = hashPassword(next);
+      await this.write({ hash, failures: 0, retryAt: null });
+      this.hash = hash;
       this.failures = 0;
       this.retryAt = null;
-      await this.write();
       this.log.info('user', 'Settings password set');
     }
     // Whoever set it is at Settings now: stay unlocked until they leave.
@@ -118,10 +120,11 @@ export class LockService {
 
   /** Written in order, so a burst of wrong guesses can't leave an older count on disk. */
   private writing: Promise<unknown> = Promise.resolve();
-  private write(): Promise<unknown> {
-    const record = { hash: this.hash, failures: this.failures, retryAt: this.retryAt };
-    this.writing = this.writing.then(() => writeJsonAtomic(this.path, record));
-    return this.writing;
+  private write(record = { hash: this.hash, failures: this.failures, retryAt: this.retryAt }): Promise<unknown> {
+    // Chained past any earlier failure: one failed write (disk full) mustn't stop every later one.
+    const next = this.writing.catch(() => undefined).then(() => writeJsonAtomic(this.path, record));
+    this.writing = next;
+    return next;
   }
   private save() {
     this.write().catch((err: Error) => this.log.error('system', `Couldn't save the Settings lock: ${err.message}`));

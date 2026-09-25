@@ -258,6 +258,8 @@ export class UpdateService {
       }
       if (!res.ok) {
         // e.g. 404 {"success":false,"data":{"error":"Unknown product or no installers available."}} before the first upload
+        // The site's answer until the product exists and has an installer: nothing is wrong on this Mac.
+        if (res.status === 404) throw new Error('no release of iLive Monitor is on whiteleyevents.co.uk yet');
         const why = (body as { data?: { error?: unknown } } | null)?.data?.error;
         throw new Error(`update server replied ${res.status}${typeof why === 'string' && why ? `: ${why}` : ''}`);
       }

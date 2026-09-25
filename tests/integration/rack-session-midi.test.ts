@@ -3,7 +3,7 @@ import { createDefaultMixerState } from '@shared/domain/defaults';
 import type { RackTarget } from '@shared/settings';
 import type { RackMixConfig } from '@shared/mixLayout';
 import { Logger } from '@main/logging/Logger';
-import { RackSession, connectErrorMessage } from '@main/rack/RackSession';
+import { RackSession, connectErrorMessage, sameLevel } from '@main/rack/RackSession';
 import { StateCache } from '@main/rack/StateCache';
 import { SIMULATOR_CAPABILITIES, SimulatedRack, SimulatorProtocol } from '@main/protocol/simulator/SimulatorProtocol';
 
@@ -112,6 +112,32 @@ describe('RackSession over a protocol that cannot report state', () => {
     c.last().notify(send(ip(3), 5, -30)); // FOH moved it in the same instant: we can't know which won
     await vi.advanceTimersByTimeAsync(100);
     expect(c.session.current.unconfirmed).toContain('send:input:3>mix:5');
+  });
+
+  it('echoes rounded to MIDI\'s 0.5 dB steps, and echoes of earlier steps of a drag, count as ours', async () => {
+    const c = client(5);
+    await online(c);
+    for (const db of [-12.3, -11.1, -9.87, -7.83]) {
+      c.cache.apply([send(ip(4), 5, db)]);
+      c.session.send([send(ip(4), 5, db)]);
+    }
+    c.last().notify(send(ip(4), 5, -12.5)); // a late echo of the drag's first step, rounded
+    c.last().notify(send(ip(4), 5, -8)); // the echo of where it stopped, rounded
+    await vi.advanceTimersByTimeAsync(100);
+    expect(c.session.current.unconfirmed).not.toContain('send:input:4>mix:5');
+    expect(c.cache.state.inputs[4]!.sends[5]!.levelDb).toBe(-7.83); // echoes don't pull the fader back
+    c.session.send([send(ip(4), 5, -7.83)]);
+    c.last().notify(send(ip(4), 5, -20)); // not anything we sent: someone else
+    await vi.advanceTimersByTimeAsync(100);
+    expect(c.session.current.unconfirmed).toContain('send:input:4>mix:5');
+  });
+
+  it('sameLevel: within MIDI\'s rounding, and off is off', () => {
+    expect(sameLevel(-7.83, -8)).toBe(true);
+    expect(sameLevel(-7.83, -7.5)).toBe(true);
+    expect(sameLevel(-7.83, -9)).toBe(false);
+    expect(sameLevel(-Infinity, -95)).toBe(true);
+    expect(sameLevel(-Infinity, -60)).toBe(false);
   });
 
   it('refuses moves while still pulling from the rack', async () => {

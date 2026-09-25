@@ -77,7 +77,7 @@ describe('updates', () => {
 
   it('Settings → About: Check for updates answers every time — up to date, failure, available', async () => {
     await boot('/settings');
-    await screen.findByRole('button', { name: 'Check for updates' });
+    fireEvent.click(await screen.findByRole('tab', { name: 'About' }));
     site = async () => feed('0.5.1');
     fireEvent.click(screen.getByRole('button', { name: 'Check for updates' }));
     fireEvent.click(within(await dialog('You’re up to date')).getByRole('button', { name: 'OK' }));
@@ -115,7 +115,7 @@ describe('updates', () => {
   it('a feed with no installer for this Mac offers the download page', async () => {
     site = async () => feed('0.6.0', { windows: { url: 'https://whiteleyevents.co.uk/x.exe' } });
     await boot('/settings');
-    await screen.findByRole('button', { name: 'Check for updates' });
+    fireEvent.click(await screen.findByRole('tab', { name: 'About' }));
     fireEvent.click(screen.getByRole('button', { name: 'Check for updates' }));
     const d = await dialog('iLive Monitor 0.6.0 is available');
     expect(within(d).getByText(/Get it from the Whiteley Events website/)).toBeInTheDocument();

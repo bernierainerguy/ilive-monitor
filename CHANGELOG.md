@@ -9,6 +9,10 @@ Add entries under **Unreleased** as you go; `npm run release:minor|patch|major` 
 
 ## [Unreleased]
 
+### Added
+- A LICENSE file and a notice in the README: the source is published to be read, and all rights are reserved.
+  The app itself is unchanged.
+
 ## [0.4.1] - 2026-09-25
 
 ### Fixed

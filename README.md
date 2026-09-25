@@ -1,5 +1,12 @@
 # iLive Monitor
 
+[![CI](https://github.com/bernierainerguy/ilive-monitor/actions/workflows/ci.yml/badge.svg)](https://github.com/bernierainerguy/ilive-monitor/actions/workflows/ci.yml)
+
+> **All rights reserved.** © 2026 Whiteley Events Ltd. The source is published to be read, not reused: it is not
+> open source, and no licence is granted to copy, modify or distribute it or anything built from it. See
+> [LICENSE](LICENSE). To use the app, download it from [whiteleyevents.co.uk](https://whiteleyevents.co.uk/software/);
+> its use is governed by the [EULA](legal/WEIM-EULA.md).
+
 A monitor-only companion to iLive Touch for the Allen & Heath iDR48 MixRack, for macOS.
 
 It does one thing: it sets the level sent from each input channel to **one aux**. The aux is chosen in
@@ -31,7 +38,7 @@ faders stay locked until it's entered.
   or on the console, and the banner counts them.
 - The faders lock while offline, while reconnecting, and until the mix configuration is entered.
 
-The rack, protocol, transport and licensing code started as a copy of iLive Touch (`~/Developer/ilive`, v0.6.1). The
+The rack, protocol, transport and licensing code started as a copy of iLive Touch 0.6.1. The
 two apps are separate products and separate repositories. Fixes to the shared parts need making in both.
 
 ## Releasing

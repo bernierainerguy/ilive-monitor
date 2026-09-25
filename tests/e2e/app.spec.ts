@@ -37,7 +37,12 @@ test('first launch → simulator → choose a mix → move a send; the mix is ke
   await page.getByRole('radiogroup', { name: 'Mix bus' }).getByRole('radio').nth(1).click();
   await page.getByRole('button', { name: 'Mix', exact: true }).click();
   await expect(page.getByLabel(/^Mix: Aux 2/)).toBeVisible();
-  await expect(page.getByRole('slider')).toHaveCount(32);
+  await expect(page.getByRole('slider')).toHaveCount(16); // a 1440 px window fits a bank of 16
+  const noScroll = await page.getByTestId('send-bank').evaluate((el) => el.scrollWidth <= el.clientWidth);
+  expect(noScroll).toBe(true);
+  await page.getByRole('button', { name: 'Ch 49–64' }).click();
+  await expect(page.getByTestId('send-input:63')).toBeVisible();
+  await page.getByRole('button', { name: 'Ch 1–16' }).click();
   await expect(page.getByRole('button', { name: /mute|pafl/i })).toHaveCount(0);
 
   const fader = page.getByTestId('send-input:0').getByRole('slider');

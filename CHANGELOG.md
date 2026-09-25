@@ -9,6 +9,14 @@ Add entries under **Unreleased** as you go; `npm run release:minor|patch|major` 
 
 ## [Unreleased]
 
+### Changed
+- The faders no longer scroll sideways. The inputs come in banks sized to fit the window (32, 16, 8 or 4
+  channels), and the bank keys (Ch 1–16, Ch 17–32…) choose which one is on the faders. Strips widen to fill the
+  bank. After a resize, the bank holding the same channels stays on screen.
+
+### Removed
+- FX returns. iLive Monitor mixes input channels only, and now refuses FX return sends.
+
 ## [0.1.0] - 2026-09-25
 
 ### Added

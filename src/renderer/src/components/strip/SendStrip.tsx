@@ -25,7 +25,7 @@ export interface SendStripProps {
 }
 
 /**
- * One source's send to the bus: its lit name plate, the send-level fader and the
+ * One input's send to the bus: its lit name plate, the send-level fader and the
  * level. That's all: no mute, pan, PAFL or processing, by design.
  */
 export const SendStrip = memo(function SendStrip({ strip, bus, faderHeight, accent, enabled }: SendStripProps) {
@@ -45,7 +45,8 @@ export const SendStrip = memo(function SendStrip({ strip, bus, faderHeight, acce
     <Box
       data-testid={`send-${strip.kind}:${strip.index}`}
       sx={{
-        width: t.controls.stripWidth, flex: '0 0 auto', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: `${GAP}px`,
+        // Strips share the bank's width evenly: no scrolling, and wider strips on a big screen.
+        flex: '1 1 0', minWidth: 0, maxWidth: 180, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: `${GAP}px`,
         p: `${PAD}px 5px`, mx: '2px', boxSizing: 'border-box', borderRadius: '8px', bgcolor: t.colours.surface, border: `1px solid ${t.colours.border}`,
       }}
     >

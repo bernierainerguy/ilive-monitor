@@ -2,9 +2,9 @@
 
 A monitor-only companion to iLive Touch for the Allen & Heath iDR48 MixRack, for macOS.
 
-It does one thing: it sets the level sent from each input and FX return to **one aux**. The aux is chosen in
-Settings and kept between launches. There are no channel faders, mutes, pan, send mutes, PAFL, processing,
-routing, scenes, shows or other mixes, and the main process refuses any change that isn't a send level to that aux
+It does one thing: it sets the level sent from each input channel to **one aux**. The aux is chosen in
+Settings and kept between launches. There are no channel faders, mutes, pan, send mutes, PAFL, FX returns,
+processing, routing, scenes, shows or other mixes, and the main process refuses any change that isn't a send level to that aux
 (`src/shared/monitorPolicy.ts`, enforced in `src/main/services/MixerService.ts`), even one sent straight over IPC.
 
 ```bash
@@ -22,6 +22,9 @@ rack's **mix configuration**. The rack numbers its send buses by that configurat
 faders stay locked until it's entered.
 
 ## How it behaves on the rack
+
+- The inputs come in banks sized to fit the window (32, 16, 8 or 4 channels). The bank keys choose which one
+  is on the faders; nothing scrolls.
 
 - Every connect reads from the rack. Nothing is ever pushed except the send levels you move.
 - Over iLive MIDI the rack can't report send levels. Each one is ghosted, with a level of "?", until it moves here

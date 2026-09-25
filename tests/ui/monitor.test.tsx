@@ -60,12 +60,12 @@ describe('first launch', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Mix' }));
     expect(await screen.findByLabelText(/^Mix: Aux 3/)).toBeInTheDocument();
-    expect(screen.getAllByRole('slider')).toHaveLength(32);
+    expect(screen.getAllByRole('slider')).toHaveLength(8); // one bank that fits the (test) window
   });
 });
 
 describe('the mix screen', () => {
-  it('only has send faders: no mutes, pan, PAFL, channel faders or other buses', async () => {
+  it('only has input send faders: no mutes, pan, PAFL, FX returns, channel faders or other buses', async () => {
     const { be } = await boot();
     await connect(be);
     await act(async () => void be.settings.update({ bus: aux(be, 1) }));
@@ -73,10 +73,23 @@ describe('the mix screen', () => {
     expect(within(bank).getAllByRole('slider').every((s) => /send$/.test(s.getAttribute('aria-label') ?? ''))).toBe(true);
     expect(screen.queryByRole('button', { name: /mute|pafl|pan|solo/i })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Aux 2|Sends on/i })).not.toBeInTheDocument(); // the bus can't be changed here
-    fireEvent.click(screen.getByRole('button', { name: 'FX returns' }));
+    expect(screen.queryByTestId(/^send-fxReturn/)).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /FX/ })).not.toBeInTheDocument();
+  });
+
+  it('shows one bank that fits the window, chosen with the bank keys; nothing scrolls', async () => {
+    const { be } = await boot();
+    await act(async () => void be.settings.update({ bus: aux(be, 1) }));
+    const bank = await screen.findByTestId('send-bank');
+    expect(bank).toHaveStyle({ overflow: 'hidden' });
+    const keys = within(screen.getByRole('group', { name: 'Banks' })).getAllByRole('button');
+    expect(keys.map((k) => k.textContent)).toEqual(['Ch 1–8', 'Ch 9–16', 'Ch 17–24', 'Ch 25–32', 'Ch 33–40', 'Ch 41–48', 'Ch 49–56', 'Ch 57–64']);
+    expect(keys[0]).toHaveAttribute('aria-pressed', 'true');
     expect(within(bank).getAllByRole('slider')).toHaveLength(8);
-    fireEvent.click(screen.getByRole('button', { name: 'Inputs 33–64' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Ch 57–64' }));
     expect(screen.getByTestId('send-input:63')).toBeInTheDocument();
+    expect(screen.queryByTestId('send-input:0')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Ch 57–64' })).toHaveAttribute('aria-pressed', 'true');
   });
 
   it('a fader or a typed level sets the send on the rack, and nothing else moves', async () => {
@@ -129,10 +142,10 @@ describe('the mix screen', () => {
     await connect(be);
     const bus = aux(be, 1);
     await act(async () => void be.settings.update({ bus }));
-    expect(await screen.findByText(/72 send levels not known yet/)).toBeInTheDocument();
+    expect(await screen.findByText(/64 send levels not known yet/)).toBeInTheDocument();
     expect(within(screen.getByTestId('send-input:0')).getByRole('button', { name: /level$/ })).toHaveTextContent('?');
     act(() => be.rack.apply({ t: 'send', strip: { kind: 'input', index: 0 }, target: { kind: 'mix', index: bus }, patch: { levelDb: -3 } }));
-    expect(await screen.findByText(/71 send levels not known yet/)).toBeInTheDocument();
+    expect(await screen.findByText(/63 send levels not known yet/)).toBeInTheDocument();
     expect(within(screen.getByTestId('send-input:0')).getByRole('button', { name: /level$/ })).toHaveTextContent('-3');
   });
 

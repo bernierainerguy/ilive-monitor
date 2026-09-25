@@ -32,7 +32,6 @@ async function online(c: ReturnType<typeof client>) {
   c.session.connect(target);
   await vi.waitFor(() => expect(c.session.current.phase).toBe('online'));
 }
-const fx = (index: number) => ({ kind: 'fxReturn' as const, index });
 const send = (strip: { kind: 'input' | 'fxReturn'; index: number }, bus: number, levelDb: number) => ({ t: 'send' as const, strip, target: { kind: 'mix' as const, index: bus }, patch: { levelDb } });
 
 describe('RackSession over a protocol that cannot report state', () => {
@@ -51,16 +50,17 @@ describe('RackSession over a protocol that cannot report state', () => {
     const c = client(5);
     await online(c);
     const u = () => c.session.current.unconfirmed;
-    expect(u()).toHaveLength(64 + 8); // every input and FX return
+    expect(u()).toHaveLength(64); // every input channel
     expect(u()).toContain('send:input:0>mix:5');
-    expect(u()).toContain('send:fxReturn:7>mix:5');
+    expect(u()).toContain('send:input:63>mix:5');
+    expect(u().some((k) => k.includes('fxReturn'))).toBe(false);
     c.last().rack.apply(send(ip(0), 5, -3)); // moved on the console / by another client
     await vi.advanceTimersByTimeAsync(100);
     expect(u()).not.toContain('send:input:0>mix:5');
-    c.session.send([send(fx(1), 5, -10)]); // moved here
+    c.session.send([send(ip(1), 5, -10)]); // moved here
     await vi.advanceTimersByTimeAsync(100);
-    expect(u()).not.toContain('send:fxReturn:1>mix:5');
-    expect(u()).toHaveLength(70);
+    expect(u()).not.toContain('send:input:1>mix:5');
+    expect(u()).toHaveLength(62);
   });
 
   it('follows the bus in Settings, remembering what other buses already confirmed', async () => {
@@ -68,10 +68,10 @@ describe('RackSession over a protocol that cannot report state', () => {
     await online(c);
     c.last().rack.apply(send(ip(2), 6, -12)); // bus 6 heard while bus 5 is chosen
     await vi.advanceTimersByTimeAsync(100);
-    expect(c.session.current.unconfirmed).toHaveLength(72);
+    expect(c.session.current.unconfirmed).toHaveLength(64);
     c.bus = 6;
     c.session.busChanged();
-    expect(c.session.current.unconfirmed).toHaveLength(71);
+    expect(c.session.current.unconfirmed).toHaveLength(63);
     expect(c.session.current.unconfirmed).not.toContain('send:input:2>mix:6');
     c.bus = 14; // the main on this rack, not an aux
     c.session.busChanged();
@@ -84,11 +84,11 @@ describe('RackSession over a protocol that cannot report state', () => {
     c.cache.apply([send(ip(0), 5, -3)]); // as MixerService does
     c.session.send([send(ip(0), 5, -3)]);
     await vi.advanceTimersByTimeAsync(100);
-    expect(c.session.current.unconfirmed).toHaveLength(71);
+    expect(c.session.current.unconfirmed).toHaveLength(63);
     c.rack.scenes.set(1, c.rack.state); // a scene the rack recalls without telling us what moved
     c.rack.recallScene(1);
     await vi.advanceTimersByTimeAsync(100);
-    expect(c.session.current.unconfirmed).toHaveLength(72);
+    expect(c.session.current.unconfirmed).toHaveLength(64);
     c.session.disconnect();
     expect(c.session.current.unconfirmed).toEqual([]);
   });

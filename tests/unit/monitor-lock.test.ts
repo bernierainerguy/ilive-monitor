@@ -23,11 +23,14 @@ const level = (db: number, bus = AUX, strip: MixerChange extends never ? never :
 describe('monitor policy: send levels to the chosen aux, nothing else', () => {
   const ok = (c: MixerChange, bus: number | null = AUX) => authorizeMonitorChange(state, bus, c).ok;
 
-  it('allows a level from any input or FX return to the chosen aux, including -inf and +10', () => {
+  it('allows a level from any input channel to the chosen aux, including -inf and +10', () => {
     expect(ok(level(-6))).toBe(true);
     expect(ok(level(-Infinity))).toBe(true);
     expect(ok(level(10, AUX, ip(63)))).toBe(true);
-    expect(ok(level(0, AUX, { kind: 'fxReturn', index: 7 }))).toBe(true);
+  });
+
+  it('refuses FX return sends: the app only mixes input channels', () => {
+    expect(authorizeMonitorChange(state, AUX, level(0, AUX, { kind: 'fxReturn', index: 0 }))).toMatchObject({ ok: false, reason: 'Only input channel sends can be changed' });
   });
 
   it('refuses every other kind of change', () => {
@@ -79,11 +82,12 @@ describe('monitor policy: send levels to the chosen aux, nothing else', () => {
     expect(authorizeMonitorChange(state, null, level(0))).toMatchObject({ ok: false, reason: /Settings/ });
   });
 
-  it('offers auxes only, fed by 64 inputs and the FX returns', () => {
+  it('offers auxes only, fed by the 64 input channels', () => {
     expect(monitorBuses(state).every((m) => m.role === 'aux')).toBe(true);
     expect(isMonitorBus(state, GROUP)).toBe(false);
     expect(isMonitorBus(state, null)).toBe(false);
-    expect(monitorSources(state)).toHaveLength(64 + state.fxReturns.length);
+    expect(monitorSources(state)).toHaveLength(64);
+    expect(monitorSources(state).every((r) => r.kind === 'input')).toBe(true);
   });
 });
 

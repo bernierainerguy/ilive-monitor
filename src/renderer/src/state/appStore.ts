@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { NO_CAPABILITIES, emptyHealth, type RackStatus } from '@shared/rack';
 import type { MonitorSettings } from '@shared/settings';
+import type { LockStatus } from '@shared/lock';
 import type { UpdateState } from '@shared/update';
 import type { LegalView, LicenceReason, LicenceView } from '@shared/licence';
 
@@ -8,6 +9,7 @@ import type { LegalView, LicenceReason, LicenceView } from '@shared/licence';
 interface AppStore {
   rack: RackStatus;
   settings: MonitorSettings | null;
+  lock: LockStatus | null;
   update: UpdateState | null;
   /** The operator opened the update dialog from the top-bar pill. */
   updateDialogOpen: boolean;
@@ -28,6 +30,7 @@ export const initialRackStatus: RackStatus = {
 export const useAppStore = create<AppStore>((set) => ({
   rack: initialRackStatus,
   settings: null,
+  lock: null,
   update: null,
   updateDialogOpen: false,
   licence: null,

@@ -9,6 +9,34 @@ Add entries under **Unreleased** as you go; `npm run release:minor|patch|major` 
 
 ## [Unreleased]
 
+### Added
+- Settings password. Once one is set, Settings shows an unlock prompt, and the main process refuses every
+  Settings change while locked: the mix, racks, connect and disconnect, theme, the password itself and the licence
+  details. The faders keep working.
+  - Settings locks again when you leave it, after 10 minutes there, and at every launch. There's also a
+    **Lock now** key.
+  - After 5 wrong passwords, each further try waits 30 s longer.
+  - A forgotten password is removed by deleting settings-lock.json (in ~/Library/Application Support/iLive
+    Monitor) while the app is closed. Nothing else is lost.
+  - Settings shows a padlock in the title bar while locked.
+
+### Changed
+- The mix is no longer shouted on the Mix screen. The coloured plate, the coloured edge on the faders and the
+  coloured fader caps are gone. A small grey "Aux 2 · name" at the right of the bank keys says which mix it is.
+
+### Fixed
+- A send level the rack hasn't confirmed is no longer nudged from the guess. ↑/↓ and the scroll wheel do nothing
+  on a ghosted fader, and touching it sets the level where you touch. Before, after a reconnect a single ↑ could
+  send a real -40 dB send straight to -4 dB. Typed levels, Home (0 dB) and End (off) still work.
+- A fader held when the rack drops stops sending, and nothing is sent while the app is still reading from the rack.
+- A different level from the rack in the instant after your own move (someone at FOH moving the same send) is no
+  longer taken as confirmed: the send shows "?" until it's known.
+- Saving the rack in use with a new address, port, MIDI channel or protocol reconnects to it, instead of
+  retrying the old one.
+- Escape in the level box cancels without sending what was typed.
+- A rack save the app refuses now says why.
+- The last move before quitting still reaches the rack.
+
 ## [0.2.1] - 2026-09-25
 
 ### Fixed

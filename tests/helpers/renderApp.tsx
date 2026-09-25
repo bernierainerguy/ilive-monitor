@@ -11,7 +11,7 @@ import { createBackend, type Backend, type Extras } from './backend';
 export async function bootApp(path = '/mix', extras: Extras = {}, opts: Parameters<typeof createBackend>[1] = {}): Promise<{ be: Backend; stop(keepDir?: boolean): Promise<void> }> {
   const be = await createBackend(extras, opts);
   setBridge(be.bridge);
-  useAppStore.setState({ rack: initialRackStatus, settings: null, toast: null, licence: null, legal: null, licenceNoticeDismissed: null, update: null, updateDialogOpen: false });
+  useAppStore.setState({ rack: initialRackStatus, settings: null, lock: null, toast: null, licence: null, legal: null, licenceNoticeDismissed: null, update: null, updateDialogOpen: false });
   useMixerStore.setState({ state: null, seq: -1 });
   const unsync = await startSync();
   window.history.replaceState(null, '', `/?windowId=main#${path}`);

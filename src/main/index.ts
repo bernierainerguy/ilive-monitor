@@ -11,6 +11,7 @@ import { RackSession } from './rack/RackSession';
 import { createProtocol } from './protocol/factory';
 import { MixerService } from './services/MixerService';
 import { SettingsService } from './services/SettingsService';
+import { LockService } from './services/LockService';
 import { UpdateService } from './services/UpdateService';
 import { signingTeam } from './services/codesign';
 import { LicenceService } from './services/LicenceService';
@@ -57,6 +58,9 @@ async function bootstrap() {
 
   const settings = new SettingsService(join(userData, 'settings.json'), log);
   await settings.init();
+  // Its own file, so deleting it removes a forgotten password and nothing else.
+  const lock = new LockService(join(userData, 'settings-lock.json'), log);
+  await lock.init();
   const cache = new StateCache(createDefaultMixerState());
   // The chosen aux, as a mix index under the rack's current mix configuration.
   const bus = () => auxBusIndex(cache.state, settings.current.aux);
@@ -71,6 +75,7 @@ async function bootstrap() {
   cache.batches.on((b) => window.send('mixer:changes', b));
   cache.resets.on((r) => window.send('mixer:reset', r));
   rack.status.on((s) => window.send('rack:status', s));
+  lock.changed.on((l) => window.send('lock:changed', l));
   let lastAux = settings.current.aux;
   settings.changed.on((s) => {
     window.send('settings:changed', s);
@@ -121,7 +126,7 @@ async function bootstrap() {
   void licence.checkin();
   licence.start();
 
-  registerIpc({ log, cache, session: rack, mixer, settings, updates, licence, legal, quit: () => app.quit(), openExternal: (url) => shell.openExternal(url) });
+  registerIpc({ log, cache, session: rack, mixer, settings, lock, updates, licence, legal, quit: () => app.quit(), openExternal: (url) => shell.openExternal(url) });
 
   window.open();
 
@@ -155,9 +160,11 @@ async function bootstrap() {
       try {
         offLastTarget(); // quitting disconnects, but the rack should still reconnect at the next launch
         await settings.flush();
+        await lock.flush();
         rack.dispose();
         licence.stop();
         updates.stop();
+        lock.dispose();
       } finally {
         app.exit(0);
       }

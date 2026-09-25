@@ -98,6 +98,33 @@ describe('RackSession over a protocol that cannot report state', () => {
     expect(c.session.current.unconfirmed).toEqual([]);
   });
 
+  it('a different level arriving just after our move is not taken as confirmed', async () => {
+    const c = client(5);
+    await online(c);
+    c.cache.apply([send(ip(3), 5, -10)]);
+    c.session.send([send(ip(3), 5, -10)]);
+    await vi.advanceTimersByTimeAsync(100);
+    expect(c.session.current.unconfirmed).not.toContain('send:input:3>mix:5');
+    c.last().notify(send(ip(3), 5, -10)); // the rack echoing our value: agreed
+    await vi.advanceTimersByTimeAsync(100);
+    expect(c.session.current.unconfirmed).not.toContain('send:input:3>mix:5');
+    c.session.send([send(ip(3), 5, -10)]);
+    c.last().notify(send(ip(3), 5, -30)); // FOH moved it in the same instant: we can't know which won
+    await vi.advanceTimersByTimeAsync(100);
+    expect(c.session.current.unconfirmed).toContain('send:input:3>mix:5');
+  });
+
+  it('refuses moves while still pulling from the rack', async () => {
+    const c = client(5);
+    const whileSyncing: boolean[] = [];
+    c.session.status.on((s) => s.phase === 'syncing' && whileSyncing.push(c.session.supports(send(ip(0), 5, 0))));
+    c.session.connect(target);
+    await vi.waitFor(() => expect(c.session.current.phase).toBe('online'));
+    expect(whileSyncing.length).toBeGreaterThan(0);
+    expect(whileSyncing.every((ok) => !ok)).toBe(true);
+    expect(c.session.supports(send(ip(0), 5, 0))).toBe(true);
+  });
+
   it('a protocol that reports its full state has nothing unconfirmed', async () => {
     const rack = new SimulatedRack();
     const cache = new StateCache(createDefaultMixerState(), 1);

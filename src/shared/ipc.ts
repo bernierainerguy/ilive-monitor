@@ -3,6 +3,7 @@ import type { MixerState } from './domain/model';
 import type { LogEntry } from './log';
 import type { UpdateState } from './update';
 import type { LegalView, LicenceRegistration, LicenceView } from './licence';
+import type { LockStatus } from './lock';
 import type { RackStatus } from './rack';
 import type { MonitorSettings, RackTarget } from './settings';
 
@@ -32,6 +33,13 @@ export interface IpcInvokeMap {
   'settings:get': { req: void; res: MonitorSettings };
   'settings:update': { req: SettingsPatch; res: MonitorSettings };
 
+  /** The Settings password. Every change Settings can make needs it unlocked. */
+  'lock:status': { req: void; res: LockStatus };
+  'lock:unlock': { req: { password: string }; res: LockStatus };
+  'lock:lock': { req: void; res: LockStatus };
+  /** Set or change (a string) or remove (null) the password. Needs Settings unlocked. */
+  'lock:setPassword': { req: { password: string | null }; res: LockStatus };
+
   'update:status': { req: void; res: UpdateState };
   'update:check': { req: void; res: UpdateState };
   'update:download': { req: void; res: UpdateState };
@@ -55,6 +63,7 @@ export interface IpcEventMap {
   'mixer:reset': { seq: number; state: MixerState };
   'rack:status': RackStatus;
   'settings:changed': MonitorSettings;
+  'lock:changed': LockStatus;
   'nav:goto': { path: string };
   'update:changed': UpdateState;
   'licence:changed': LicenceView;
@@ -67,14 +76,14 @@ export type EventChannel = keyof IpcEventMap;
 export const INVOKE_CHANNELS: readonly InvokeChannel[] = [
   'mixer:snapshot', 'mixer:dispatch',
   'rack:connect', 'rack:disconnect', 'rack:status', 'rack:saveTarget', 'rack:deleteTarget', 'rack:openLocalNetworkSettings',
-  'settings:get', 'settings:update',
+  'settings:get', 'settings:update', 'lock:status', 'lock:unlock', 'lock:lock', 'lock:setPassword',
   'update:status', 'update:check', 'update:download', 'update:openInstaller', 'update:reveal', 'update:openPage', 'update:dismiss',
   'licence:status', 'licence:register', 'licence:checkin', 'legal:status', 'legal:accept', 'legal:decline',
   'log:write',
 ];
 
 export const EVENT_CHANNELS: readonly EventChannel[] = [
-  'mixer:changes', 'mixer:reset', 'rack:status', 'settings:changed', 'nav:goto', 'update:changed', 'licence:changed', 'legal:changed',
+  'mixer:changes', 'mixer:reset', 'rack:status', 'settings:changed', 'lock:changed', 'nav:goto', 'update:changed', 'licence:changed', 'legal:changed',
 ];
 
 /** Shape of `window.ilive` exposed by preload. */

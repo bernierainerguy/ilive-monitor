@@ -1,4 +1,4 @@
-import { memo, useCallback, useEffect, useState } from 'react';
+import { memo, useCallback, useEffect, useRef, useState } from 'react';
 import { Box, Typography } from '@mui/material';
 import type { StripRef } from '@shared/domain/ids';
 import { defaultSend } from '@shared/domain/defaults';
@@ -18,8 +18,6 @@ export interface SendStripProps {
   /** The mix bus from Settings. */
   bus: number;
   faderHeight: number;
-  /** The bus's colour, for the fader cap. */
-  accent: string;
   /** False while the rack can't take the move (offline, no mix configuration). */
   enabled: boolean;
 }
@@ -28,7 +26,7 @@ export interface SendStripProps {
  * One input's send to the bus: its lit name plate, the send-level fader and the
  * level. That's all: no mute, pan, PAFL or processing, by design.
  */
-export const SendStrip = memo(function SendStrip({ strip, bus, faderHeight, accent, enabled }: SendStripProps) {
+export const SendStrip = memo(function SendStrip({ strip, bus, faderHeight, enabled }: SendStripProps) {
   const t = useTokens();
   const s = useStrip(strip);
   // MIDI can't report send levels: until the rack reports this one or it's moved here, it's a guess.
@@ -61,7 +59,7 @@ export const SendStrip = memo(function SendStrip({ strip, bus, faderHeight, acce
         <Typography noWrap sx={{ fontSize: t.fonts.stripName + 2, fontWeight: 800, lineHeight: 1.15, px: 0.5, maxWidth: '100%' }}>{s.name}</Typography>
       </Box>
       <Box sx={{ px: '4px', py: `${WELL_PAD}px`, borderRadius: '6px', flexShrink: 0, bgcolor: t.colours.faderTrack, boxShadow: `inset 0 2px 6px rgba(0,0,0,.55), inset 0 0 0 1px ${t.colours.border}` }}>
-        <Fader valueDb={level} onChange={onLevel} height={faderHeight} disabled={!enabled} label={`${s.name} send`} accent={accent} unconfirmed={unconfirmed} />
+        <Fader valueDb={level} onChange={onLevel} height={faderHeight} disabled={!enabled} label={`${s.name} send`} unconfirmed={unconfirmed} />
       </Box>
       <LevelReadout name={`${s.name} send`} db={level} unconfirmed={unconfirmed} disabled={!enabled} onCommit={onLevel} />
     </Box>
@@ -89,6 +87,8 @@ export function parseLevel(text: string): number | null {
 function LevelReadout({ name, db, unconfirmed, disabled, onCommit }: { name: string; db: number; unconfirmed: boolean; disabled: boolean; onCommit(db: number): void }) {
   const t = useTokens();
   const [editing, setEditing] = useState(false);
+  // Escape cancels. Removing the focused box can fire blur, which must not then commit what was typed.
+  const cancelled = useRef(false);
   // Locked mid-edit (the rack dropped): abandon the edit, so it doesn't reappear later.
   useEffect(() => {
     if (disabled) setEditing(false);
@@ -101,11 +101,14 @@ function LevelReadout({ name, db, unconfirmed, disabled, onCommit }: { name: str
         defaultValue={Number.isFinite(db) ? db.toFixed(1) : '-inf'}
         onFocus={(e) => e.target.select()}
         onKeyDown={(e) => {
-          if (e.key === 'Escape') setEditing(false);
+          if (e.key === 'Escape') {
+            cancelled.current = true;
+            setEditing(false);
+          }
           if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
         }}
         onBlur={(e) => {
-          const v = parseLevel(e.target.value);
+          const v = cancelled.current ? null : parseLevel(e.target.value);
           if (v !== null) onCommit(v);
           setEditing(false);
         }}
@@ -120,7 +123,10 @@ function LevelReadout({ name, db, unconfirmed, disabled, onCommit }: { name: str
       aria-label={`Edit ${name} level`}
       disabled={disabled}
       title={unconfirmed ? 'Not confirmed by the rack yet' : undefined}
-      onClick={() => setEditing(true)}
+      onClick={() => {
+        cancelled.current = false;
+        setEditing(true);
+      }}
       sx={{
         font: `600 13px ${t.fonts.mono}`, fontVariantNumeric: 'tabular-nums', height: READOUT_H, lineHeight: '20px', px: 0.5, borderRadius: '3px', bgcolor: 'transparent',
         color: unconfirmed ? t.colours.textMuted : t.colours.text, border: `1px ${unconfirmed ? 'dashed' : 'solid'} ${unconfirmed ? t.colours.border : 'transparent'}`,

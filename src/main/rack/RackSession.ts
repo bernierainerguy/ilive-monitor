@@ -1,4 +1,4 @@
-import { coalesceKey, type MixerChange } from '@shared/domain/changes';
+import { coalesceKey, getStrip, type MixerChange } from '@shared/domain/changes';
 import { isMonitorBus, monitorSources } from '@shared/monitorPolicy';
 import {
   MAX_MISSED_PROBES,
@@ -108,9 +108,13 @@ export class RackSession {
     return !!this.protocol && (p === 'online' || p === 'degraded' || p === 'syncing');
   }
 
-  /** Whether a change would reach the rack now. */
+  /**
+   * Whether a change would reach the rack now. Not while syncing: the faders are locked until the pull from
+   * the rack is done, so a move can't land on top of values that are still arriving.
+   */
   supports(c: MixerChange): boolean {
-    return !!this.protocol && this.isLive && this.protocol.supports(c);
+    const p = this._status.phase;
+    return !!this.protocol && (p === 'online' || p === 'degraded') && this.protocol.supports(c);
   }
 
   /** Begin (or switch) the connection. Returns immediately; progress arrives via `status`. */
@@ -158,6 +162,7 @@ export class RackSession {
   }
 
   dispose(): void {
+    if (this.protocol && this.isLive) this.flushOutbound(); // the last move before quitting still goes out
     this.disconnect();
     this.status.clear();
     this.meters.clear();
@@ -239,12 +244,18 @@ export class RackSession {
 
   private inbound(c: MixerChange) {
     this._status.health.lastRxAt = Date.now();
-    this.confirm(c);
     const key = coalesceKey(c);
     if (key) {
       const sentAt = this.recentOutbound.get(key);
-      if (sentAt !== undefined && Date.now() - sentAt < this.o.echoGuardMs) return;
+      if (sentAt !== undefined && Date.now() - sentAt < this.o.echoGuardMs) {
+        // Ignored as a stale echo of our own move. If it matches what we have, the rack agrees. If not, it may be
+        // an older step of our drag, or someone else moving it at the same moment: we can't tell, so say so.
+        if (this.matchesCache(c)) this.confirm(c);
+        else this.unconfirm(c);
+        return;
+      }
     }
+    this.confirm(c);
     this.cache.apply([c]);
   }
 
@@ -368,6 +379,18 @@ export class RackSession {
     if (this.confirmed.has(key)) return;
     this.confirmed.add(key);
     if (c.target.index === this.bus()) this.publishUnconfirmed(false);
+  }
+
+  private unconfirm(c: MixerChange) {
+    if (!this.tracking || c.t !== 'send' || c.target.kind !== 'mix') return;
+    if (this.confirmed.delete(unconfirmedSendKey(c.strip, c.target.index)) && c.target.index === this.bus()) this.publishUnconfirmed(false);
+  }
+
+  private matchesCache(c: MixerChange): boolean {
+    if (c.t !== 'send' || c.target.kind !== 'mix' || c.patch.levelDb === undefined) return true;
+    const s = getStrip(this.cache.state, c.strip);
+    const level = s && 'sends' in s ? (s.sends as Record<number, { levelDb: number }>)[c.target.index]?.levelDb : undefined;
+    return level === c.patch.levelDb;
   }
 
   /** The bus in Settings changed: report what's unconfirmed on the new one. */

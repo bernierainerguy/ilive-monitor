@@ -51,6 +51,12 @@ export const Fader = memo(function Fader({ valueDb, onChange, height = 260, disa
     releaseTimer.current = setTimeout(() => !drag.current && setLocalPos(null), 250);
   };
   useEffect(() => () => clearTimeout(releaseTimer.current), []);
+  // Locked mid-move: drop the drag and show the real value again.
+  useEffect(() => {
+    if (!disabled) return;
+    drag.current = null;
+    setLocalPos(null);
+  }, [disabled]);
 
   const onPointerDown = (e: PointerEvent<HTMLDivElement>) => {
     if (disabled || e.button !== 0) return;
@@ -62,7 +68,9 @@ export const Fader = memo(function Fader({ valueDb, onChange, height = 260, disa
     e.currentTarget.setPointerCapture(e.pointerId);
     const rect = track.current!.getBoundingClientRect();
     const capTop = rect.top + (1 - pos) * travel;
-    const onCap = e.clientY >= capTop && e.clientY <= capTop + CAP_H;
+    // An unconfirmed level is a guess: moving relative to it could jump the real send by any amount. So the
+    // touch always sets the level where the finger is, as on the track, and the drag carries on from there.
+    const onCap = !unconfirmed && e.clientY >= capTop && e.clientY <= capTop + CAP_H;
     // Click on the cap grabs relatively (no jump); click on the track jumps there first.
     const startPos = onCap ? pos : clamp(1 - (e.clientY - rect.top - CAP_H / 2) / travel, 0, 1);
     if (!onCap) emit(startPos);
@@ -72,6 +80,10 @@ export const Fader = memo(function Fader({ valueDb, onChange, height = 260, disa
   const onPointerMove = (e: PointerEvent<HTMLDivElement>) => {
     const d = drag.current;
     if (!d || d.id !== e.pointerId) return;
+    if (disabled) {
+      drag.current = null; // locked under the finger (the rack dropped): stop sending
+      return;
+    }
     const scale = e.shiftKey ? FINE : 1;
     emit(d.startPos - ((e.clientY - d.startY) / travel) * scale);
   };
@@ -83,7 +95,7 @@ export const Fader = memo(function Fader({ valueDb, onChange, height = 260, disa
   };
 
   const onWheel = (e: WheelEvent<HTMLDivElement>) => {
-    if (disabled) return;
+    if (disabled || unconfirmed) return; // relative: meaningless from a guessed level
     const step = (e.shiftKey ? 0.0005 : 0.002) * -e.deltaY;
     emit(pos + step);
     releaseSoon();
@@ -93,8 +105,9 @@ export const Fader = memo(function Fader({ valueDb, onChange, height = 260, disa
     if (disabled) return;
     const step = e.shiftKey ? 0.1 : 1;
     let next: number | null = null;
-    if (e.key === 'ArrowUp') next = nudgeFaderDb(valueDb, step);
-    else if (e.key === 'ArrowDown') next = nudgeFaderDb(valueDb, -step);
+    // Nudges are relative, so not from a guessed level. Home (0 dB) and End (off) are absolute.
+    if (e.key === 'ArrowUp' && !unconfirmed) next = nudgeFaderDb(valueDb, step);
+    else if (e.key === 'ArrowDown' && !unconfirmed) next = nudgeFaderDb(valueDb, -step);
     else if (e.key === 'Home') next = 0;
     else if (e.key === 'End') next = -Infinity;
     if (next === null) return;

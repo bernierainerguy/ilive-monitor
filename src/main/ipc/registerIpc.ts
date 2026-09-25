@@ -11,6 +11,7 @@ import type { SettingsService } from '../services/SettingsService';
 import type { UpdateService } from '../services/UpdateService';
 import type { LicenceService } from '../services/LicenceService';
 import type { LegalService } from '../services/LegalService';
+import type { LockService } from '../services/LockService';
 import { WINDOW_ID } from '../windows/MainWindow';
 
 export interface IpcDeps {
@@ -19,6 +20,8 @@ export interface IpcDeps {
   session: RackSession;
   mixer: MixerService;
   settings: SettingsService;
+  /** The Settings password. Absent in tests that don't need it: then Settings is always open. */
+  lock?: LockService;
   updates?: UpdateService;
   licence?: LicenceService;
   legal?: LegalService;
@@ -45,6 +48,9 @@ export function registerIpc(d: IpcDeps) {
     });
   }
 
+  /** Everything Settings can change needs it unlocked. Checked here, not just in the window. */
+  const unlocked = () => d.lock?.require();
+
   // --- mixer: send levels to the chosen bus only (MixerService enforces it) ---
   handle('mixer:snapshot', () => d.cache.snapshot());
   handle('mixer:dispatch', (changes) => d.mixer.dispatch(Array.isArray(changes) ? changes : []));
@@ -52,23 +58,31 @@ export function registerIpc(d: IpcDeps) {
   // --- rack -----------------------------------------------------------------
   handle('rack:status', () => d.session.current);
   handle('rack:connect', ({ targetId }) => {
+    unlocked();
     const t = d.settings.current.racks.find((c) => c.id === targetId);
     if (!t) throw new Error('Unknown rack');
     d.session.connect(t);
   });
-  handle('rack:disconnect', () => d.session.disconnect());
+  handle('rack:disconnect', () => {
+    unlocked();
+    d.session.disconnect();
+  });
   handle('rack:saveTarget', (t) => {
+    unlocked();
     if (t.mixConfig !== undefined && !parseMixConfig(t.mixConfig)) throw new Error(mixConfigError(t.mixConfig as RackMixConfig) ?? 'Invalid rack mix configuration');
     const before = d.settings.current.racks.find((c) => c.id === t.id);
     const after = d.settings.upsertRack(t).racks.find((c) => c.id === t.id)!;
-    // The mix configuration decides what every send addresses: reconnect so it takes effect now.
-    const live = d.session.current.targetId === t.id && d.session.current.phase !== 'offline';
-    const changed = JSON.stringify(before?.mixConfig ?? null) !== JSON.stringify(after.mixConfig ?? null);
-    if (live && changed) d.session.connect(after);
+    // Where the rack is (address, protocol, MIDI channel) and its mix configuration decide what every send
+    // reaches: if any of them changed on the rack in use, reconnect so it takes effect now, even mid-retry.
+    const wire = (r: typeof after | undefined) => JSON.stringify(r ? [r.host, r.port, r.protocol, r.midiChannel, r.mixConfig ?? null] : null);
+    const inUse = d.session.current.targetId === t.id && d.session.current.phase !== 'offline';
+    const changed = wire(before) !== wire(after);
+    if (inUse && changed) d.session.connect(after);
     // Offline, lay the mixes out now, so Settings offers this rack's auxes before connecting.
     else if (changed && d.session.current.phase === 'offline') d.session.conform(after);
   });
   handle('rack:deleteTarget', ({ id }) => {
+    unlocked();
     if (d.session.current.targetId === id) d.session.disconnect();
     d.settings.deleteRack(id);
   });
@@ -78,7 +92,17 @@ export function registerIpc(d: IpcDeps) {
 
   // --- settings -------------------------------------------------------------
   handle('settings:get', () => d.settings.current);
-  handle('settings:update', (patch) => d.settings.update({ aux: patch?.aux, themeId: patch?.themeId }));
+  handle('settings:update', (patch) => {
+    unlocked();
+    return d.settings.update({ aux: patch?.aux, themeId: patch?.themeId });
+  });
+
+  // --- the Settings password --------------------------------------------------
+  const open = () => ({ hasPassword: false, unlocked: true, retryAt: null });
+  handle('lock:status', () => d.lock?.status ?? open());
+  handle('lock:unlock', ({ password }) => d.lock?.unlock(password) ?? open());
+  handle('lock:lock', () => d.lock?.lock() ?? open());
+  handle('lock:setPassword', ({ password }) => d.lock?.setPassword(password) ?? open());
 
   // --- updates --------------------------------------------------------------
   const noUpdates = (checkError: string | null = 'Updates are unavailable in this build'): UpdateState =>
@@ -98,7 +122,11 @@ export function registerIpc(d: IpcDeps) {
   });
   const noLegal = (): LegalView => ({ eulaVersion: '', accepted: true, acceptedAt: null });
   handle('licence:status', () => d.licence?.view ?? unlicensed());
-  handle('licence:register', ({ name, email }) => d.licence?.register({ name, email }) ?? unlicensed());
+  handle('licence:register', ({ name, email }) => {
+    // First registration happens at the launch screen, before anyone can reach Settings; changing it is a Settings change.
+    if (d.licence?.view.identity) unlocked();
+    return d.licence?.register({ name, email }) ?? unlicensed();
+  });
   handle('licence:checkin', async () => {
     if (!d.licence) return unlicensed();
     await d.licence.checkin();

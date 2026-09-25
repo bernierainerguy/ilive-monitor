@@ -149,6 +149,51 @@ describe('the mix screen', () => {
     expect(within(screen.getByTestId('send-input:0')).getByRole('button', { name: /level$/ })).toHaveTextContent('-3');
   });
 
+  it('a level the rack has not confirmed is never nudged relative to the guess', async () => {
+    const { be } = await boot('/mix', { midiLike: true });
+    await connect(be);
+    await act(async () => void be.settings.update({ aux: 1 }));
+    const bus = aux(be, 1);
+    // What the app last knew: -5. What the rack really has now (moved while we were away): -40.
+    act(() => be.cache.apply([{ t: 'send', strip: { kind: 'input', index: 0 }, target: { kind: 'mix', index: bus }, patch: { levelDb: -5 } }]));
+    be.rack.state = { ...be.rack.state, inputs: be.rack.state.inputs.map((s, i) => (i === 0 ? { ...s, sends: { ...s.sends, [bus]: { ...s.sends[bus]!, levelDb: -40 } } } : s)) };
+    const fader = within(await screen.findByTestId('send-input:0')).getByRole('slider');
+    fireEvent.keyDown(fader, { key: 'ArrowUp' });
+    fireEvent.wheel(fader, { deltaY: -100 });
+    await settle();
+    expect(sendLevel(be, 0, bus)).toBe(-40); // untouched: ↑ would have sent -4
+    fireEvent.keyDown(fader, { key: 'Home' }); // absolute moves still work
+    await settle();
+    expect(sendLevel(be, 0, bus)).toBe(0);
+    await waitFor(() => expect(within(screen.getByTestId('send-input:0')).getByRole('button', { name: /level$/ })).not.toHaveTextContent('?'));
+    fireEvent.keyDown(fader, { key: 'ArrowDown' }); // now confirmed (we set it): nudges work again
+    await settle();
+    expect(sendLevel(be, 0, bus)).toBe(-1);
+  });
+
+  it('Escape in the level box cancels without sending', async () => {
+    const { be } = await boot();
+    await connect(be);
+    await act(async () => void be.settings.update({ aux: 1 }));
+    fireEvent.click(within(await screen.findByTestId('send-input:2')).getByRole('button', { name: /level$/ }));
+    const input = screen.getByRole('textbox');
+    fireEvent.change(input, { target: { value: '+10' } });
+    fireEvent.keyDown(input, { key: 'Escape' });
+    fireEvent.blur(input);
+    await settle();
+    expect(sendLevel(be, 2, aux(be, 1))).toBe(-Infinity);
+  });
+
+  it('saving the connected rack with a new address reconnects to it', async () => {
+    const { be } = await boot('/settings');
+    await connect(be);
+    const reconnect = vi.spyOn(be.session, 'connect');
+    await act(async () => void be.bridge.invoke('rack:saveTarget', { ...SIM, name: 'Renamed' }));
+    expect(reconnect).not.toHaveBeenCalled(); // a name isn't worth dropping the link for
+    await act(async () => void be.bridge.invoke('rack:saveTarget', { ...SIM, host: '10.0.0.99' }));
+    expect(reconnect).toHaveBeenCalledWith(expect.objectContaining({ host: '10.0.0.99' }));
+  });
+
   it('when the rack has fewer auxes than the one chosen, says so', async () => {
     const { be } = await boot();
     await act(async () => void be.settings.update({ aux: 30 }));
@@ -171,9 +216,9 @@ describe('the mix screen', () => {
     const rackIndex = aux(be, 2);
     expect(rackIndex).not.toBe(offlineIndex);
     expect(be.cache.state.mixes[rackIndex]!.role).toBe('aux');
-    fireEvent.keyDown(within(await screen.findByTestId('send-input:0')).getByRole('slider'), { key: 'ArrowUp' });
+    fireEvent.keyDown(within(await screen.findByTestId('send-input:0')).getByRole('slider'), { key: 'Home' }); // 0 dB: absolute
     await settle();
-    expect(sendLevel(be, 0, rackIndex)).toBeGreaterThan(-Infinity); // the rack's Aux 2…
+    expect(sendLevel(be, 0, rackIndex)).toBe(0); // the rack's Aux 2…
     expect(sendLevel(be, 0, offlineIndex)).toBe(-Infinity); // …not whatever mix the default layout called Aux 2
   });
 

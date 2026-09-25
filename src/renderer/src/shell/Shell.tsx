@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { Alert, Box, Button, ButtonBase, Chip, Snackbar, Typography } from '@mui/material';
 import TuneIcon from '@mui/icons-material/Tune';
 import SettingsIcon from '@mui/icons-material/Settings';
+import LockIcon from '@mui/icons-material/Lock';
 import { plateInk } from '@shared/theme';
 import { useAppStore } from '../state/appStore';
 import { useTokens } from '../theme/ThemeProvider';
@@ -28,8 +29,10 @@ export function Shell({ children }: { children: ReactNode }) {
         }}
       >
         <Typography sx={{ fontWeight: 800, fontSize: 14, mr: 1, whiteSpace: 'nowrap' }}>iLive Monitor</Typography>
-        <NavKey path="/mix" label="Mix" icon={<TuneIcon sx={{ fontSize: 18 }} />} />
-        <NavKey path="/settings" label="Settings" icon={<SettingsIcon sx={{ fontSize: 18 }} />} />
+        <Box component="nav" aria-label="Views" sx={{ display: 'flex', gap: 1 }}>
+          <NavKey path="/mix" label="Mix" icon={<TuneIcon sx={{ fontSize: 18 }} />} />
+          <SettingsKey />
+        </Box>
         <Box sx={{ flex: 1 }} />
         <UpdatePill />
         <RackChip />
@@ -44,6 +47,12 @@ export function Shell({ children }: { children: ReactNode }) {
       </Snackbar>
     </Box>
   );
+}
+
+/** Settings, with a padlock while a password keeps it locked. */
+function SettingsKey() {
+  const locked = useAppStore((s) => !!s.lock && !s.lock.unlocked);
+  return <NavKey path="/settings" label="Settings" icon={locked ? <LockIcon aria-label="locked" sx={{ fontSize: 18 }} /> : <SettingsIcon sx={{ fontSize: 18 }} />} />;
 }
 
 function NavKey({ path, label, icon }: { path: string; label: string; icon: ReactNode }) {

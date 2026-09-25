@@ -17,6 +17,9 @@ export function RackSettings() {
   const targets = useAppStore((s) => s.settings?.racks ?? EMPTY);
   const notify = useAppStore((s) => s.notify);
   const [editing, setEditing] = useState<RackTarget | null>(null);
+  // A refused save (a bad port, or Settings locked meanwhile) says why instead of failing silently.
+  const attempt = (fn: () => Promise<unknown>) =>
+    fn().catch((e: Error) => notify(e.message.replace(/^Error invoking remote method '[^']+': (Error: )?/, ''), 'error'));
 
   const h = rack.health;
   const rows: Array<[string, string]> = [
@@ -65,8 +68,8 @@ export function RackSettings() {
                 {editing.protocol === 'ilive-midi-tcp' && <MixConfigFields value={editing.mixConfig} onChange={(mixConfig) => setEditing({ ...editing, mixConfig })} />}
                 <FormControlLabel control={<Switch checked={editing.autoConnect} onChange={(_, v) => setEditing({ ...editing, autoConnect: v })} />} label="Reconnect on launch" />
                 <Stack direction="row" spacing={1}>
-                  <Button variant="contained" disabled={!!(editing.mixConfig && mixConfigError(editing.mixConfig))} onClick={async () => { await invoke('rack:saveTarget', editing); notify('Saved', 'success'); }}>Save</Button>
-                  <Button color="error" onClick={async () => { await invoke('rack:deleteTarget', { id: editing.id }); setEditing(null); }}>Delete</Button>
+                  <Button variant="contained" disabled={!!(editing.mixConfig && mixConfigError(editing.mixConfig))} onClick={() => void attempt(async () => { await invoke('rack:saveTarget', editing); notify('Saved', 'success'); })}>Save</Button>
+                  <Button color="error" onClick={() => void attempt(async () => { await invoke('rack:deleteTarget', { id: editing.id }); setEditing(null); })}>Delete</Button>
                 </Stack>
               </Stack>
             </CardContent>
@@ -75,10 +78,10 @@ export function RackSettings() {
       </Stack>
       <Stack spacing={2}>
         <Stack direction="row" spacing={1}>
-          <Button variant="contained" disabled={!editing || !!(editing.mixConfig && mixConfigError(editing.mixConfig))} onClick={async () => { if (!editing) return; await invoke('rack:saveTarget', editing); await invoke('rack:connect', { targetId: editing.id }); }}>
+          <Button variant="contained" disabled={!editing || !!(editing.mixConfig && mixConfigError(editing.mixConfig))} onClick={() => void attempt(async () => { if (!editing) return; await invoke('rack:saveTarget', editing); await invoke('rack:connect', { targetId: editing.id }); })}>
             Connect{editing ? ` to ${editing.name}` : ''}
           </Button>
-          <Button disabled={rack.phase === 'offline'} onClick={() => invoke('rack:disconnect', undefined)}>Disconnect</Button>
+          <Button disabled={rack.phase === 'offline'} onClick={() => void attempt(() => invoke('rack:disconnect', undefined))}>Disconnect</Button>
         </Stack>
         {rack.lastError?.includes('Local Network') && (
           <Alert severity="warning" sx={{ maxWidth: 640 }} action={<Button color="inherit" size="small" onClick={() => invoke('rack:openLocalNetworkSettings', undefined)}>Open settings</Button>}>

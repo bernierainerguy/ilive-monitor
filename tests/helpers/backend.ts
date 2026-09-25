@@ -13,7 +13,7 @@ import { MixerService } from '@main/services/MixerService';
 import { SettingsService } from '@main/services/SettingsService';
 import { handlers } from './electronMock';
 
-export type Extras = Pick<IpcDeps, 'licence' | 'legal' | 'quit' | 'updates' | 'openExternal'>;
+export type Extras = Pick<IpcDeps, 'licence' | 'legal' | 'quit' | 'updates' | 'openExternal' | 'lock'>;
 
 /**
  * The real main-process stack (IPC handlers, services, settings on disk, the
@@ -56,6 +56,7 @@ export async function createBackend(extras: Extras = {}, opts: { dir?: string; m
     }
   });
   extras.licence?.changed.on((l) => emit('licence:changed', l));
+  extras.lock?.changed.on((l) => emit('lock:changed', l));
   extras.legal?.changed.on((l) => emit('legal:changed', l));
   extras.updates?.changed.on((u) => emit('update:changed', u));
 

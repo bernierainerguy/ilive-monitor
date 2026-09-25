@@ -70,22 +70,10 @@ export default function MixScreen() {
 
   const live = rack.phase === 'online' || rack.phase === 'degraded';
   const enabled = live && rack.capabilities.sends;
-  const colour = busStrip.colour !== 'off' ? t.strip[busStrip.colour] : t.colours.sofActive;
 
   return (
     <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, px: 1.5, py: 1, borderBottom: `1px solid ${t.colours.border}` }}>
-        <Box
-          aria-label={`Mix: ${label} ${busStrip.name}`}
-          sx={{
-            display: 'flex', alignItems: 'baseline', gap: 1, px: 1.5, height: 38, borderRadius: '7px', flexShrink: 0,
-            bgcolor: colour, color: plateInk(colour, t), boxShadow: 'inset 0 1px 0 rgba(255,255,255,.3), inset 0 -2px 0 rgba(0,0,0,.25)', lineHeight: '38px',
-          }}
-        >
-          <Typography component="span" sx={{ fontSize: 12, fontWeight: 700, opacity: 0.8 }}>{label}</Typography>
-          <Typography component="span" sx={{ fontSize: 18, fontWeight: 800 }}>{busStrip.name}</Typography>
-          {busStrip.stereo && <Typography component="span" sx={{ fontSize: 11, fontWeight: 700, opacity: 0.8 }}>ST</Typography>}
-        </Box>
         <Box role="group" aria-label="Banks" sx={{ display: 'flex', flexWrap: 'wrap', p: '3px', gap: '2px', borderRadius: '9px', bgcolor: t.colours.faderTrack, boxShadow: `inset 0 0 0 1px ${t.colours.border}` }}>
           {banks.map((b) => {
             const on = b.id === bank?.id;
@@ -104,16 +92,20 @@ export default function MixScreen() {
             );
           })}
         </Box>
+        {/* Which mix this is: there to check, not to shout. It's set in Settings. */}
+        <Typography aria-label={`Mix: ${label} ${busStrip.name}`} noWrap sx={{ ml: 'auto', fontSize: 12, color: t.colours.textMuted, minWidth: 0 }}>
+          {label} · {busStrip.name}{busStrip.stereo ? ' · ST' : ''}
+        </Typography>
       </Box>
       <Box
         ref={well}
         data-testid="send-bank"
         sx={{
-          flex: 1, minHeight: 0, display: 'flex', overflow: 'hidden', py: '4px', px: '2px', borderTop: `3px solid ${colour}`,
+          flex: 1, minHeight: 0, display: 'flex', overflow: 'hidden', py: '4px', px: '2px',
         }}
       >
         {bank?.strips.map((ref) => (
-          <SendStrip key={`${ref.kind}:${ref.index}`} strip={ref} bus={bus} faderHeight={faderHeight} accent={colour} enabled={enabled} />
+          <SendStrip key={`${ref.kind}:${ref.index}`} strip={ref} bus={bus} faderHeight={faderHeight} enabled={enabled} />
         ))}
       </Box>
     </Box>

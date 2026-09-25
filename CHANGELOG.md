@@ -9,6 +9,8 @@ Add entries under **Unreleased** as you go; `npm run release:minor|patch|major` 
 
 ## [Unreleased]
 
+## [0.4.2] - 2026-09-25
+
 ### Added
 - A LICENSE file and a notice in the README: the source is published to be read, and all rights are reserved.
   The app itself is unchanged.
@@ -123,7 +125,8 @@ Add entries under **Unreleased** as you go; `npm run release:minor|patch|major` 
   - Licence registration and check-in, EULA and privacy notice, and update checks against
     whiteleyevents.co.uk (product `weim`).
 
-[Unreleased]: https://github.com/bernierainerguy/ilive-monitor/compare/v0.4.1...HEAD
+[Unreleased]: https://github.com/bernierainerguy/ilive-monitor/compare/v0.4.2...HEAD
+[0.4.2]: https://github.com/bernierainerguy/ilive-monitor/compare/v0.4.1...v0.4.2
 [0.4.1]: https://github.com/bernierainerguy/ilive-monitor/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/bernierainerguy/ilive-monitor/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/bernierainerguy/ilive-monitor/compare/v0.2.1...v0.3.0

@@ -22,6 +22,12 @@ export const isMonitorBus = (state: MixerState, index: number | null): boolean =
 /** The auxes Settings offers, in rack order. */
 export const monitorBuses = (state: MixerState): MixStrip[] => state.mixes.filter((m) => m.role === 'aux');
 
+/** The mix index of aux number `aux` (1-based) under the current mix configuration, or null if there's no such aux. */
+export function auxBusIndex(state: MixerState, aux: number | null): number | null {
+  if (aux === null || !Number.isInteger(aux) || aux < 1) return null;
+  return monitorBuses(state)[aux - 1]?.ref.index ?? null;
+}
+
 /** The strips this app sends from: the 64 input channels. FX returns are deliberately left out. */
 export const monitorSources = (state: MixerState): StripRef[] => state.inputs.map((s) => s.ref);
 

@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import type { MixerChange } from '@shared/domain/changes';
 import { createDefaultMixerState } from '@shared/domain/defaults';
 import type { MixerState } from '@shared/domain/model';
-import { authorizeMonitorChange, isMonitorBus, monitorBuses, monitorSources } from '@shared/monitorPolicy';
+import { authorizeMonitorChange, auxBusIndex, isMonitorBus, monitorBuses, monitorSources } from '@shared/monitorPolicy';
 import { Logger } from '@main/logging/Logger';
 import { MixerService } from '@main/services/MixerService';
 import { SettingsService, parseRack, parseSettings } from '@main/services/SettingsService';
@@ -44,7 +44,7 @@ describe('monitor policy: send levels to the chosen aux, nothing else', () => {
       { t: 'eq', strip: ip(0), patch: { enabled: false } },
       { t: 'gate', strip: ip(0), patch: { enabled: true } },
       { t: 'comp', strip: ip(0), patch: { enabled: true } },
-      { t: 'delay', strip: ip(0), patch: { enabled: true } },
+      { t: 'delay', strip: ip(0), patch: { bypass: true } },
       { t: 'preamp', socket: 0, patch: { phantom: true } },
       { t: 'inputConfig', strip: ip(0), patch: { polarity: true } },
       { t: 'dcaAssign', strip: ip(0), dca: 0, on: true },
@@ -80,6 +80,13 @@ describe('monitor policy: send levels to the chosen aux, nothing else', () => {
 
   it('refuses everything until a bus is chosen', () => {
     expect(authorizeMonitorChange(state, null, level(0))).toMatchObject({ ok: false, reason: /Settings/ });
+  });
+
+  it('finds an aux by its number, whatever mix it sits on', () => {
+    expect(auxBusIndex(state, 3)).toBe(AUX);
+    expect(auxBusIndex(state, null)).toBeNull();
+    expect(auxBusIndex(state, 0)).toBeNull();
+    expect(auxBusIndex(state, monitorBuses(state).length + 1)).toBeNull();
   });
 
   it('offers auxes only, fed by the 64 input channels', () => {
@@ -140,32 +147,34 @@ describe('SettingsService: the bus is kept between launches', () => {
     await a.init();
     const seen = vi.fn();
     a.changed.on(seen);
-    a.update({ bus: 3, themeId: 'red' });
+    a.update({ aux: 3, themeId: 'red' });
     a.upsertRack({ id: 'r', name: 'iDR48', host: ' 10.0.0.10 ', port: 51325, protocol: 'ilive-midi-tcp', midiChannel: 0, autoConnect: true });
     a.setLastTarget('r');
     await a.flush();
     expect(seen).toHaveBeenCalled();
 
     const b = new SettingsService(path, new Logger('error'));
-    expect(await b.init()).toMatchObject({ bus: 3, themeId: 'red', lastTargetId: 'r', racks: [{ id: 'simulator' }, { id: 'r', host: '10.0.0.10' }] });
+    expect(await b.init()).toMatchObject({ aux: 3, themeId: 'red', lastTargetId: 'r', racks: [{ id: 'simulator' }, { id: 'r', host: '10.0.0.10' }] });
     b.deleteRack('r');
-    expect(b.current).toMatchObject({ racks: [{ id: 'simulator' }], lastTargetId: null, bus: 3 });
+    expect(b.current).toMatchObject({ racks: [{ id: 'simulator' }], lastTargetId: null, aux: 3 });
   });
 
   it('starts fresh from a missing or corrupt file, and never trusts what it reads', async () => {
     dir = await mkdtemp(join(tmpdir(), 'ilm-'));
     const path = join(dir, 'settings.json');
     const s = new SettingsService(path, new Logger('error'));
-    expect((await s.init()).bus).toBeNull();
+    expect((await s.init()).aux).toBeNull();
     await writeFile(path, '{nope');
     expect((await new SettingsService(path, new Logger('error')).init()).racks.map((r) => r.id)).toEqual(['simulator']);
-    expect(parseSettings({ bus: 99, themeId: 'hot-pink', racks: [{ id: 'x' }, null], lastTargetId: 'x' })).toMatchObject({ bus: null, themeId: 'dark', racks: [], lastTargetId: null });
-    expect(parseSettings({ bus: 1.5 }).bus).toBeNull();
+    expect(parseSettings({ aux: 99, themeId: 'hot-pink', racks: [{ id: 'x' }, null], lastTargetId: 'x' })).toMatchObject({ aux: null, themeId: 'dark', racks: [], lastTargetId: null });
+    expect(parseSettings({ aux: 1.5 }).aux).toBeNull();
+    expect(parseSettings({ aux: 0 }).aux).toBeNull();
+    expect(parseSettings({ aux: 32 }).aux).toBe(32);
     expect(parseSettings(null).schema).toBe(1);
-    s.update({ bus: -1 });
-    expect(s.current.bus).toBeNull();
+    s.update({ aux: -1 });
+    expect(s.current.aux).toBeNull();
     await s.flush();
-    expect(JSON.parse(await readFile(path, 'utf8')).bus).toBeNull();
+    expect(JSON.parse(await readFile(path, 'utf8')).aux).toBeNull();
   });
 
   it('validates racks, including the mix configuration', () => {

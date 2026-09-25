@@ -4,7 +4,6 @@ import { BUILTIN_THEMES, plateInk } from '@shared/theme';
 import { invoke } from '../api/bridge';
 import { BUILD } from '../buildInfo';
 import { Caption } from '../components/common/Plates';
-import { busLabel } from '../services/labels';
 import { useAppStore } from '../state/appStore';
 import { useMixerStore } from '../state/mixerStore';
 import { useTokens } from '../theme/ThemeProvider';
@@ -56,7 +55,7 @@ export default function SettingsScreen() {
 /** Pick the aux whose sends this Mac adjusts. Saved at once, and the app opens on it every time. */
 function BusPicker() {
   const t = useTokens();
-  const bus = useAppStore((s) => s.settings?.bus ?? null);
+  const aux = useAppStore((s) => s.settings?.aux ?? null);
   const live = useAppStore((s) => s.rack.phase === 'online' || s.rack.phase === 'degraded');
   const state = useMixerStore((s) => s.state);
   if (!state) return null;
@@ -71,23 +70,24 @@ function BusPicker() {
         <Typography variant="body2">This rack has no auxes. Check the mix configuration below.</Typography>
       ) : (
         <Box role="radiogroup" aria-label="Mix bus" sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, 112px)', gap: '8px' }}>
-          {auxes.map((m) => {
-            const on = m.ref.index === bus;
+          {auxes.map((m, i) => {
+            const n = i + 1;
+            const on = n === aux;
             const c = m.colour !== 'off' ? t.strip[m.colour] : t.colours.border;
             return (
               <ButtonBase
                 key={m.ref.index}
                 role="radio"
                 aria-checked={on}
-                aria-label={`${busLabel(state, m.ref.index)} ${m.name}`}
-                onClick={() => void update({ bus: m.ref.index })}
+                aria-label={`Aux ${n} ${m.name}`}
+                onClick={() => void update({ aux: n })}
                 sx={{
                   height: 58, borderRadius: '7px', flexDirection: 'column', gap: '2px',
                   color: on ? plateInk(t.colours.sofActive, t) : t.colours.text, bgcolor: on ? t.colours.sofActive : t.colours.surface,
                   borderTop: `4px solid ${c}`, boxShadow: `inset 0 0 0 1px ${on ? t.colours.sofActive : t.colours.border}`,
                 }}
               >
-                <Typography component="span" sx={{ fontSize: 10, fontWeight: 700, opacity: 0.8 }}>{busLabel(state, m.ref.index)}{m.stereo ? ' · ST' : ''}</Typography>
+                <Typography component="span" sx={{ fontSize: 10, fontWeight: 700, opacity: 0.8 }}>Aux {n}{m.stereo ? ' · ST' : ''}</Typography>
                 <Typography component="span" noWrap sx={{ fontSize: 14, fontWeight: 800, maxWidth: 100 }}>{m.name}</Typography>
               </ButtonBase>
             );

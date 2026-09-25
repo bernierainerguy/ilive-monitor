@@ -15,7 +15,7 @@ import type { MonitorSettings, RackTarget } from './settings';
 export type DispatchResult = { accepted: number; rejected: Array<{ index: number; reason: string }> };
 
 /** What the Settings page may change. Racks go through the rack channels. */
-export type SettingsPatch = Partial<Pick<MonitorSettings, 'bus' | 'themeId'>>;
+export type SettingsPatch = Partial<Pick<MonitorSettings, 'aux' | 'themeId'>>;
 
 export interface IpcInvokeMap {
   'mixer:snapshot': { req: void; res: { seq: number; state: MixerState } };

@@ -21,8 +21,11 @@ export interface MonitorSettings {
   readonly schema: 1;
   racks: RackTarget[];
   lastTargetId: string | null;
-  /** The mix bus (mix index, zero-based) whose sends this Mac adjusts. Null until chosen in Settings. */
-  bus: number | null;
+  /**
+   * The aux whose sends this Mac adjusts, by aux number (1 = the rack's first aux), as an engineer names it.
+   * Not a mix index: where Aux 3 sits depends on the rack's mix configuration, which can change. Null until chosen.
+   */
+  aux: number | null;
   themeId: string;
 }
 
@@ -33,6 +36,6 @@ export const DEFAULT_SETTINGS: MonitorSettings = {
   schema: 1,
   racks: [SIMULATOR_RACK],
   lastTargetId: null,
-  bus: null,
+  aux: null,
   themeId: 'dark',
 };

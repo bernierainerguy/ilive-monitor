@@ -34,7 +34,7 @@ export class SettingsService {
 
   update(patch: SettingsPatch): MonitorSettings {
     const next = { ...this.s };
-    if (patch.bus !== undefined) next.bus = parseBus(patch.bus);
+    if (patch.aux !== undefined) next.aux = parseAux(patch.aux);
     if (patch.themeId !== undefined) next.themeId = parseTheme(patch.themeId);
     return this.commit(next);
   }
@@ -71,8 +71,9 @@ export class SettingsService {
 
 const isObj = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v);
 
-function parseBus(v: unknown): number | null {
-  return typeof v === 'number' && Number.isInteger(v) && v >= 0 && v < IDR48.mixBuses ? v : null;
+/** Aux numbers run from 1; the rack has at most 32 mixes. */
+function parseAux(v: unknown): number | null {
+  return typeof v === 'number' && Number.isInteger(v) && v >= 1 && v <= IDR48.mixBuses ? v : null;
 }
 
 function parseTheme(v: unknown): string {
@@ -95,5 +96,5 @@ export function parseSettings(v: unknown): MonitorSettings {
   if (!isObj(v)) return DEFAULT_SETTINGS;
   const racks = Array.isArray(v['racks']) ? v['racks'].map(parseRack).filter((r): r is RackTarget => r !== null) : [];
   const last = typeof v['lastTargetId'] === 'string' && racks.some((r) => r.id === v['lastTargetId']) ? (v['lastTargetId'] as string) : null;
-  return { schema: 1, racks, lastTargetId: last, bus: parseBus(v['bus']), themeId: parseTheme(v['themeId']) };
+  return { schema: 1, racks, lastTargetId: last, aux: parseAux(v['aux']), themeId: parseTheme(v['themeId']) };
 }

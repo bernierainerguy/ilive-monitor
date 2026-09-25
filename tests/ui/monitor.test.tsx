@@ -55,7 +55,7 @@ describe('first launch', () => {
     const radios = within(picker).getAllByRole('radio');
     expect(radios).toHaveLength(monitorBuses(be.cache.state).length); // auxes only: no groups, matrices or mains
     fireEvent.click(radios[2]!);
-    await waitFor(() => expect(be.settings.current.bus).toBe(aux(be, 3)));
+    await waitFor(() => expect(be.settings.current.aux).toBe(3));
     expect(radios[2]).toHaveAttribute('aria-checked', 'true');
 
     fireEvent.click(screen.getByRole('button', { name: 'Mix' }));
@@ -68,7 +68,7 @@ describe('the mix screen', () => {
   it('only has input send faders: no mutes, pan, PAFL, FX returns, channel faders or other buses', async () => {
     const { be } = await boot();
     await connect(be);
-    await act(async () => void be.settings.update({ bus: aux(be, 1) }));
+    await act(async () => void be.settings.update({ aux: 1 }));
     const bank = await screen.findByTestId('send-bank');
     expect(within(bank).getAllByRole('slider').every((s) => /send$/.test(s.getAttribute('aria-label') ?? ''))).toBe(true);
     expect(screen.queryByRole('button', { name: /mute|pafl|pan|solo/i })).not.toBeInTheDocument();
@@ -79,7 +79,7 @@ describe('the mix screen', () => {
 
   it('shows one bank that fits the window, chosen with the bank keys; nothing scrolls', async () => {
     const { be } = await boot();
-    await act(async () => void be.settings.update({ bus: aux(be, 1) }));
+    await act(async () => void be.settings.update({ aux: 1 }));
     const bank = await screen.findByTestId('send-bank');
     expect(bank).toHaveStyle({ overflow: 'hidden' });
     const keys = within(screen.getByRole('group', { name: 'Banks' })).getAllByRole('button');
@@ -96,7 +96,7 @@ describe('the mix screen', () => {
     const { be } = await boot();
     await connect(be);
     const bus = aux(be, 2);
-    await act(async () => void be.settings.update({ bus }));
+    await act(async () => void be.settings.update({ aux: 2 }));
     const before = structuredClone(be.rack.state);
 
     fireEvent.click(within(await screen.findByTestId('send-input:0')).getByRole('button', { name: /^Edit .* send level$/ }));
@@ -123,7 +123,7 @@ describe('the mix screen', () => {
     const { be } = await boot();
     await connect(be);
     const bus = aux(be, 1);
-    await act(async () => void be.settings.update({ bus }));
+    await act(async () => void be.settings.update({ aux: 1 }));
     await screen.findByTestId('send-bank');
     act(() => be.rack.apply({ t: 'send', strip: { kind: 'input', index: 4 }, target: { kind: 'mix', index: bus }, patch: { levelDb: -12 } }));
     await waitFor(() => expect(within(screen.getByTestId('send-input:4')).getByRole('slider')).toHaveAttribute('aria-valuenow', '-12'));
@@ -131,7 +131,7 @@ describe('the mix screen', () => {
 
   it('locks the faders while offline', async () => {
     const { be } = await boot();
-    await act(async () => void be.settings.update({ bus: aux(be, 1) }));
+    await act(async () => void be.settings.update({ aux: 1 }));
     await screen.findByTestId('send-bank');
     expect(screen.getAllByRole('slider').every((s) => s.getAttribute('aria-disabled') === 'true')).toBe(true);
     expect(screen.getByText(/faders are locked until you connect/)).toBeInTheDocument();
@@ -141,7 +141,7 @@ describe('the mix screen', () => {
     const { be } = await boot('/mix', { midiLike: true });
     await connect(be);
     const bus = aux(be, 1);
-    await act(async () => void be.settings.update({ bus }));
+    await act(async () => void be.settings.update({ aux: 1 }));
     expect(await screen.findByText(/64 send levels not known yet/)).toBeInTheDocument();
     expect(within(screen.getByTestId('send-input:0')).getByRole('button', { name: /level$/ })).toHaveTextContent('?');
     act(() => be.rack.apply({ t: 'send', strip: { kind: 'input', index: 0 }, target: { kind: 'mix', index: bus }, patch: { levelDb: -3 } }));
@@ -149,18 +149,57 @@ describe('the mix screen', () => {
     expect(within(screen.getByTestId('send-input:0')).getByRole('button', { name: /level$/ })).toHaveTextContent('-3');
   });
 
-  it('when the chosen bus is not an aux on this rack, asks for it again', async () => {
+  it('when the rack has fewer auxes than the one chosen, says so', async () => {
     const { be } = await boot();
-    const group = be.cache.state.mixes.find((m) => m.role === 'group')!.ref.index;
-    await act(async () => void be.settings.update({ bus: group }));
-    expect(await screen.findByRole('heading', { name: /isn.t an aux on this rack/ })).toBeInTheDocument();
+    await act(async () => void be.settings.update({ aux: 30 }));
+    expect(await screen.findByRole('heading', { name: 'This rack has no Aux 30' })).toBeInTheDocument();
+  });
+
+  it('Aux 2 stays Aux 2 when the rack lays its mixes out differently from the default', async () => {
+    const { be } = await boot('/mix', { midiLike: true });
+    await act(async () => void be.settings.update({ aux: 2 }));
+    expect(await screen.findByLabelText(/^Mix: Aux 2/)).toBeInTheDocument();
+    const offlineIndex = aux(be, 2);
+    // A rack with 8 groups before its auxes: its Aux 2 is a different mix channel.
+    const rackWithGroups: RackTarget = { id: 'midi', name: 'iDR48', host: '', port: 51325, protocol: 'ilive-midi-tcp', midiChannel: 0, autoConnect: true,
+      mixConfig: { monoGroups: 8, stereoGroups: 0, monoAuxes: 12, stereoAuxes: 0, main: 'lrMono', monoMatrices: 8, stereoMatrices: 0, monoFx: 4, stereoFx: 0 } };
+    await act(async () => {
+      be.settings.upsertRack(rackWithGroups);
+      await be.bridge.invoke('rack:connect', { targetId: 'midi' });
+    });
+    await waitFor(() => expect(be.session.current.phase).toBe('online'));
+    const rackIndex = aux(be, 2);
+    expect(rackIndex).not.toBe(offlineIndex);
+    expect(be.cache.state.mixes[rackIndex]!.role).toBe('aux');
+    fireEvent.keyDown(within(await screen.findByTestId('send-input:0')).getByRole('slider'), { key: 'ArrowUp' });
+    await settle();
+    expect(sendLevel(be, 0, rackIndex)).toBeGreaterThan(-Infinity); // the rack's Aux 2…
+    expect(sendLevel(be, 0, offlineIndex)).toBe(-Infinity); // …not whatever mix the default layout called Aux 2
+  });
+
+  it('switching from a real rack back to the simulator goes back to the simulator\'s layout', async () => {
+    const { be } = await boot();
+    const defaultIndex = aux(be, 2);
+    await act(async () => void be.bridge.invoke('rack:saveTarget', { id: 'r', name: 'R', host: '10.0.0.10', port: 51325, protocol: 'ilive-midi-tcp', midiChannel: 0, autoConnect: true,
+      mixConfig: { monoGroups: 8, stereoGroups: 0, monoAuxes: 12, stereoAuxes: 0, main: 'lrMono', monoMatrices: 8, stereoMatrices: 0, monoFx: 4, stereoFx: 0 } }));
+    expect(aux(be, 2)).not.toBe(defaultIndex);
+    await connect(be);
+    expect(aux(be, 2)).toBe(defaultIndex);
+  });
+
+  it('saving a mix configuration offline offers that rack\'s auxes in Settings straight away', async () => {
+    const { be } = await boot('/settings');
+    await act(async () => void be.bridge.invoke('rack:saveTarget', { id: 'r', name: 'R', host: '10.0.0.10', port: 51325, protocol: 'ilive-midi-tcp', midiChannel: 0, autoConnect: true,
+      mixConfig: { monoGroups: 0, stereoGroups: 0, monoAuxes: 4, stereoAuxes: 2, main: 'lr', monoMatrices: 0, stereoMatrices: 0, monoFx: 0, stereoFx: 0 } }));
+    await waitFor(() => expect(within(screen.getByRole('radiogroup', { name: 'Mix bus' })).getAllByRole('radio')).toHaveLength(6));
+    expect(screen.getAllByText(/Aux \d · ST/)).toHaveLength(2);
   });
 });
 
 describe('the bus is kept between launches', () => {
   it('a relaunch opens straight on the same mix', async () => {
     const first = await boot();
-    await act(async () => void first.be.settings.update({ bus: aux(first.be, 4) }));
+    await act(async () => void first.be.settings.update({ aux: 4 }));
     const dir = first.be.dir;
     await first.stop(true);
     stop = null;
@@ -174,7 +213,7 @@ describe('bypassing the UI changes nothing', () => {
     const { be } = await boot();
     await connect(be);
     const bus = aux(be, 1);
-    await act(async () => void be.settings.update({ bus }));
+    await act(async () => void be.settings.update({ aux: 1 }));
     const before = structuredClone(be.rack.state);
     const r = await be.bridge.invoke('mixer:dispatch', [
       { t: 'fader', strip: { kind: 'input', index: 0 }, db: 0 },
@@ -187,7 +226,7 @@ describe('bypassing the UI changes nothing', () => {
     expect(r.rejected).toHaveLength(5);
     await settle();
     expect(be.rack.state).toEqual(before);
-    await expect(be.bridge.invoke('settings:update', { bus: 'x' as never })).resolves.toMatchObject({ bus: null });
+    await expect(be.bridge.invoke('settings:update', { aux: 'x' as never })).resolves.toMatchObject({ aux: null });
   });
 
   it('there is no channel for shows, scenes, processing, routing or profiles', async () => {

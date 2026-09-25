@@ -12,11 +12,19 @@ import {
   type RackStatus,
 } from '@shared/rack';
 import type { RackTarget } from '@shared/settings';
-import { applyMixLayout, mixLayout, parseMixConfig } from '@shared/mixLayout';
+import { applyMixLayout, mixLayout, parseMixConfig, type MixLayout } from '@shared/mixLayout';
+import { createDefaultMixerState } from '@shared/domain/defaults';
 import type { Logger } from '../logging/Logger';
 import type { MixRackProtocol } from '../protocol/MixRackProtocol';
 import { Emitter } from '../transport/Transport';
 import type { StateCache } from './StateCache';
+
+/** The mixes as the app lays them out by default (and the simulator's rack has them). */
+const DEFAULT_LAYOUT: MixLayout = {
+  slots: createDefaultMixerState().mixes.map((m) => ({ role: m.role, stereo: m.stereo, channels: [] })),
+  mixSends: new Map(),
+  fxSends: new Map(),
+};
 
 export type ProtocolFactory = (target: RackTarget) => MixRackProtocol;
 
@@ -173,7 +181,7 @@ export class RackSession {
         return;
       }
       this.protocol = protocol;
-      this.conformMixes(target);
+      this.conform(target);
       this.bindProtocol(protocol);
       const isReconnect = this.everConnected;
       this.everConnected = true;
@@ -198,14 +206,18 @@ export class RackSession {
     }
   }
 
-  /** Reshape the show's mixes to the rack's configured layout, so strip N addresses the right rack mix. */
-  private conformMixes(target: RackTarget) {
+  /**
+   * Reshape the mixes to the rack's configured layout, so strip N addresses the right rack mix and
+   * "Aux 3" is the rack's Aux 3. Also used offline, so Settings offers the rack's auxes before connecting.
+   */
+  conform(target: RackTarget) {
     const cfg = target.protocol === 'ilive-midi-tcp' ? parseMixConfig(target.mixConfig) : null;
-    if (!cfg) return;
-    const next = applyMixLayout(this.cache.state, mixLayout(cfg));
+    // No configuration (the simulator, or MIDI before one is entered): the default layout, not the last rack's.
+    const next = applyMixLayout(this.cache.state, cfg ? mixLayout(cfg) : DEFAULT_LAYOUT);
     if (!next) return;
-    this.cache.replace(next, { dirty: true });
-    this.log.info('network', 'Rearranged the show\'s mixes to match the rack mix configuration');
+    this.cache.replace(next);
+    this.log.info('network', 'Arranged the mixes to match the rack mix configuration');
+    this.publishUnconfirmed(true); // the chosen aux may now be a different mix
   }
 
   private bindProtocol(p: MixRackProtocol) {

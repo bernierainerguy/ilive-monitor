@@ -9,6 +9,20 @@ Add entries under **Unreleased** as you go; `npm run release:minor|patch|major` 
 
 ## [Unreleased]
 
+### Fixed
+- The mix is saved as its aux number, not as a mix channel. A mix chosen before connecting, or before the rack's
+  mix configuration was entered, could otherwise become a different aux once the rack's layout applied. Aux 2 is
+  now always the rack's Aux 2.
+- Settings offers the rack's own auxes before connecting: those of the last rack used, or of a rack whose mix
+  configuration was just saved.
+- Switching from a real rack to the simulator goes back to the simulator's layout, instead of keeping the real
+  rack's.
+- Disconnecting now stops the app reconnecting to that rack at the next launch. Quitting still keeps the
+  reconnect.
+- A failed first connection no longer says the rack was "lost".
+- A typed level abandoned because the rack dropped no longer reappears when it comes back.
+- The tests are now typechecked too.
+
 ## [0.2.0] - 2026-09-25
 
 ### Changed

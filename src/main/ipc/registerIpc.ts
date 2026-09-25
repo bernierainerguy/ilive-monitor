@@ -63,7 +63,10 @@ export function registerIpc(d: IpcDeps) {
     const after = d.settings.upsertRack(t).racks.find((c) => c.id === t.id)!;
     // The mix configuration decides what every send addresses: reconnect so it takes effect now.
     const live = d.session.current.targetId === t.id && d.session.current.phase !== 'offline';
-    if (live && JSON.stringify(before?.mixConfig ?? null) !== JSON.stringify(after.mixConfig ?? null)) d.session.connect(after);
+    const changed = JSON.stringify(before?.mixConfig ?? null) !== JSON.stringify(after.mixConfig ?? null);
+    if (live && changed) d.session.connect(after);
+    // Offline, lay the mixes out now, so Settings offers this rack's auxes before connecting.
+    else if (changed && d.session.current.phase === 'offline') d.session.conform(after);
   });
   handle('rack:deleteTarget', ({ id }) => {
     if (d.session.current.targetId === id) d.session.disconnect();
@@ -75,7 +78,7 @@ export function registerIpc(d: IpcDeps) {
 
   // --- settings -------------------------------------------------------------
   handle('settings:get', () => d.settings.current);
-  handle('settings:update', (patch) => d.settings.update({ bus: patch?.bus, themeId: patch?.themeId }));
+  handle('settings:update', (patch) => d.settings.update({ aux: patch?.aux, themeId: patch?.themeId }));
 
   // --- updates --------------------------------------------------------------
   const noUpdates = (checkError: string | null = 'Updates are unavailable in this build'): UpdateState =>

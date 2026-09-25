@@ -18,14 +18,19 @@ function client(bus: number | null = 5) {
   const rack = new SimulatedRack();
   const cache = new StateCache(createDefaultMixerState(), 1);
   const protocols: SimulatorProtocol[] = [];
-  const session = new RackSession(cache, new Logger('error'), () => {
+  const state = { bus };
+  const session: RackSession = new RackSession(cache, new Logger('error'), () => {
     const p = new SimulatorProtocol(rack, { meterFps: 0 });
     Object.defineProperty(p, 'capabilities', { value: { ...SIMULATOR_CAPABILITIES, stateQuery: 'partial' } });
     protocols.push(p);
     return p;
-  }, { echoGuardMs: 50, bus: () => c.bus });
-  const c = { rack, cache, session, bus, last: () => protocols[protocols.length - 1]! };
-  return c;
+  }, { echoGuardMs: 50, bus: () => state.bus });
+  return {
+    rack, cache, session,
+    get bus() { return state.bus; },
+    set bus(v: number | null) { state.bus = v; },
+    last: () => protocols[protocols.length - 1]!,
+  };
 }
 
 async function online(c: ReturnType<typeof client>) {

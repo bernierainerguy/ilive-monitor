@@ -1,5 +1,5 @@
 import { coalesceKey, type MixerChange } from '@shared/domain/changes';
-import { authorizeMonitorChange } from '@shared/monitorPolicy';
+import { authorizeMonitorChange, auxBusIndex } from '@shared/monitorPolicy';
 import { invoke } from '../api/bridge';
 import { useAppStore } from '../state/appStore';
 import { useMixerStore } from '../state/mixerStore';
@@ -17,8 +17,8 @@ let timer: ReturnType<typeof setTimeout> | null = null;
 
 export function dispatch(...changes: MixerChange[]): boolean {
   const state = useMixerStore.getState().state;
-  const bus = useAppStore.getState().settings?.bus ?? null;
-  const allowed = state ? changes.filter((c) => authorizeMonitorChange(state, bus, c).ok) : [];
+  const aux = useAppStore.getState().settings?.aux ?? null;
+  const allowed = state ? changes.filter((c) => authorizeMonitorChange(state, auxBusIndex(state, aux), c).ok) : [];
   if (!allowed.length) return false;
   useMixerStore.getState().applyLocal(allowed);
   for (const c of allowed) {

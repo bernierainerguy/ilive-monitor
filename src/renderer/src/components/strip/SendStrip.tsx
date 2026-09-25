@@ -1,4 +1,4 @@
-import { memo, useCallback, useState } from 'react';
+import { memo, useCallback, useEffect, useState } from 'react';
 import { Box, Typography } from '@mui/material';
 import type { StripRef } from '@shared/domain/ids';
 import { defaultSend } from '@shared/domain/defaults';
@@ -89,6 +89,10 @@ export function parseLevel(text: string): number | null {
 function LevelReadout({ name, db, unconfirmed, disabled, onCommit }: { name: string; db: number; unconfirmed: boolean; disabled: boolean; onCommit(db: number): void }) {
   const t = useTokens();
   const [editing, setEditing] = useState(false);
+  // Locked mid-edit (the rack dropped): abandon the edit, so it doesn't reappear later.
+  useEffect(() => {
+    if (disabled) setEditing(false);
+  }, [disabled]);
   if (editing && !disabled) {
     return (
       <input

@@ -2,6 +2,7 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createDefaultMixerState } from '@shared/domain/defaults';
+import { auxBusIndex } from '@shared/monitorPolicy';
 import type { EventChannel, ILiveBridge, IpcEventMap } from '@shared/ipc';
 import { SIMULATOR_CAPABILITIES, SimulatedRack, SimulatorProtocol } from '@main/protocol/simulator/SimulatorProtocol';
 import { Logger } from '@main/logging/Logger';
@@ -33,9 +34,9 @@ export async function createBackend(extras: Extras = {}, opts: { dir?: string; m
 
   const settings = new SettingsService(join(dir, 'settings.json'), log);
   await settings.init();
-  const bus = () => settings.current.bus;
   const rack = new SimulatedRack();
   const cache = new StateCache(createDefaultMixerState(), 1);
+  const bus = () => auxBusIndex(cache.state, settings.current.aux);
   const session = new RackSession(cache, log, () => {
     const p = new SimulatorProtocol(rack, { meterFps: 0 });
     if (opts.midiLike) Object.defineProperty(p, 'capabilities', { value: { ...SIMULATOR_CAPABILITIES, stateQuery: 'partial' } });
@@ -46,11 +47,11 @@ export async function createBackend(extras: Extras = {}, opts: { dir?: string; m
   cache.batches.on((b) => emit('mixer:changes', b));
   cache.resets.on((r) => emit('mixer:reset', r));
   session.status.on((s) => emit('rack:status', s));
-  let lastBus = settings.current.bus;
+  let lastAux = settings.current.aux;
   settings.changed.on((s) => {
     emit('settings:changed', s);
-    if (s.bus !== lastBus) {
-      lastBus = s.bus;
+    if (s.aux !== lastAux) {
+      lastAux = s.aux;
       session.busChanged();
     }
   });

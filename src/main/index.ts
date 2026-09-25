@@ -4,6 +4,7 @@ import { execFileSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { BrowserWindow, Menu, app, crashReporter, net, powerSaveBlocker, shell, type BaseWindow } from 'electron';
 import { createDefaultMixerState } from '@shared/domain/defaults';
+import { auxBusIndex } from '@shared/monitorPolicy';
 import { Logger, consoleSink, createFileSink } from './logging/Logger';
 import { StateCache } from './rack/StateCache';
 import { RackSession } from './rack/RackSession';
@@ -56,27 +57,31 @@ async function bootstrap() {
 
   const settings = new SettingsService(join(userData, 'settings.json'), log);
   await settings.init();
-  const bus = () => settings.current.bus;
-
   const cache = new StateCache(createDefaultMixerState());
+  // The chosen aux, as a mix index under the rack's current mix configuration.
+  const bus = () => auxBusIndex(cache.state, settings.current.aux);
   const rack = new RackSession(cache, log, createProtocol, { bus });
   const mixer = new MixerService(cache, rack, log, bus);
+  // Lay the mixes out as the last rack has them, so Settings offers its auxes before connecting.
+  const lastRack = settings.current.racks.find((r) => r.id === settings.current.lastTargetId);
+  if (lastRack) rack.conform(lastRack);
 
   const window = new MainWindow(log, preloadPathFor(__dirname), process.env['ELECTRON_RENDERER_URL'], join(__dirname, '../renderer/index.html'));
 
   cache.batches.on((b) => window.send('mixer:changes', b));
   cache.resets.on((r) => window.send('mixer:reset', r));
   rack.status.on((s) => window.send('rack:status', s));
-  let lastBus = settings.current.bus;
+  let lastAux = settings.current.aux;
   settings.changed.on((s) => {
     window.send('settings:changed', s);
-    if (s.bus !== lastBus) {
-      lastBus = s.bus;
+    if (s.aux !== lastAux) {
+      lastAux = s.aux;
       rack.busChanged();
-      log.info('user', `Mix bus set to ${s.bus === null ? 'none' : s.bus + 1}`);
+      log.info('user', `Mix set to ${s.aux === null ? 'none' : `Aux ${s.aux}`}`);
     }
   });
-  rack.status.on((s) => s.targetId && settings.setLastTarget(s.targetId));
+  // Disconnecting clears it, so a rack the operator disconnected from isn't reconnected at the next launch.
+  const offLastTarget = rack.status.on((s) => settings.setLastTarget(s.targetId));
 
   // --- updates: checked against whiteleyevents.co.uk --------------------------------------
   const updates = new UpdateService({
@@ -148,6 +153,7 @@ async function bootstrap() {
     quitting = true;
     void (async () => {
       try {
+        offLastTarget(); // quitting disconnects, but the rack should still reconnect at the next launch
         await settings.flush();
         rack.dispose();
         licence.stop();

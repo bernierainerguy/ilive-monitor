@@ -1,11 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Box, Button, ButtonBase, Stack, Typography } from '@mui/material';
-import { isMonitorBus } from '@shared/monitorPolicy';
+import { auxBusIndex } from '@shared/monitorPolicy';
 import { plateInk } from '@shared/theme';
 import { SendStrip, STRIP_CHROME } from '../components/strip/SendStrip';
 import { bankFor, bankSize, makeBanks } from '../services/banks';
-import { busLabel } from '../services/labels';
 import { useAppStore } from '../state/appStore';
 import { useMixerStore } from '../state/mixerStore';
 import { useTokens } from '../theme/ThemeProvider';
@@ -23,12 +22,13 @@ const MIN_STRIP = 76;
 export default function MixScreen() {
   const t = useTokens();
   const nav = useNavigate();
-  const bus = useAppStore((s) => s.settings?.bus ?? null);
+  const aux = useAppStore((s) => s.settings?.aux ?? null);
   const rack = useAppStore((s) => s.rack);
-  // Subscribe to the bus strip and the shape of the mixes only, never to levels.
+  // Subscribe to the aux's strip and the layout of the mixes only, never to levels.
+  const bus = useMixerStore((s) => (s.state ? auxBusIndex(s.state, aux) : null));
   const busStrip = useMixerStore((s) => (s.state && bus !== null ? s.state.mixes[bus] : undefined));
-  const valid = useMixerStore((s) => (s.state ? isMonitorBus(s.state, bus) : false));
-  const label = useMixerStore((s) => (s.state && bus !== null && valid ? busLabel(s.state, bus) : ''));
+  const valid = bus !== null;
+  const label = `Aux ${aux ?? ''}`;
   const inputs = useMixerStore((s) => s.state?.inputs.length ?? 0);
 
   const well = useRef<HTMLDivElement>(null);
@@ -52,15 +52,15 @@ export default function MixScreen() {
   const [first, setFirst] = useState(0);
   const bank = bankFor(banks, first);
 
-  if (bus === null || !valid || !busStrip) {
+  if (aux === null || bus === null || !busStrip) {
     return (
       <Box sx={{ height: '100%', display: 'grid', placeItems: 'center', p: 3 }}>
         <Stack spacing={1.5} alignItems="center" sx={{ maxWidth: 460, textAlign: 'center' }}>
-          <Typography variant="h6" sx={{ fontWeight: 800 }}>{bus === null ? 'Choose your mix' : 'Your mix isn’t an aux on this rack'}</Typography>
+          <Typography variant="h6" sx={{ fontWeight: 800 }}>{aux === null ? 'Choose your mix' : `This rack has no Aux ${aux}`}</Typography>
           <Typography color="text.secondary">
-            {bus === null
+            {aux === null
               ? 'Pick the aux this Mac mixes in Settings. iLive Monitor opens on it every time.'
-              : 'The rack’s mix configuration has changed since the mix was chosen. Choose it again in Settings.'}
+              : 'Its mix configuration has fewer auxes than that. Check the configuration, or choose another aux, in Settings.'}
           </Typography>
           <Button variant="contained" onClick={() => nav('/settings')}>Open Settings</Button>
         </Stack>

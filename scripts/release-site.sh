@@ -89,6 +89,10 @@ APPLE_KEYCHAIN_PROFILE="$NOTARY_PROFILE" CSC_IDENTITY_AUTO_DISCOVERY=false \
 [ -f "$DMG" ] || die "expected $DMG was not produced."
 
 APP="$(ls -d "release/${VERSION}"/mac-arm64/*.app)"
+# macOS's Local Network privacy tells apps apart by Mach-O UUID: the app's must not be Electron's stock one.
+STOCK_UUID="$(dwarfdump --uuid node_modules/electron/dist/Electron.app/Contents/MacOS/Electron | awk '{print $2}' | head -1)"
+APP_UUID="$(dwarfdump --uuid "$APP/Contents/MacOS/iLive Monitor" | awk '{print $2}' | head -1)"
+[ -n "$APP_UUID" ] && [ "$APP_UUID" != "$STOCK_UUID" ] || die "the app still has Electron's stock Mach-O UUID; macOS would never ask for Local Network access."
 codesign --verify --deep --strict --verbose=2 "$APP"
 # Captured first: with pipefail, `grep -q` quitting early can SIGPIPE codesign and fail a correctly signed app.
 SIGNED_BY="$(codesign -dv --verbose=2 "$APP" 2>&1 || true)"

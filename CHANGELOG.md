@@ -9,6 +9,13 @@ Add entries under **Unreleased** as you go; `npm run release:minor|patch|major` 
 
 ## [Unreleased]
 
+### Fixed
+- macOS never asked to let iLive Monitor onto the local network, and never listed it under Privacy & Security ›
+  Local Network, so it couldn't reach the rack. Every Electron app built on the same Electron version shares one
+  program ID (Mach-O UUID), and macOS files its Local Network decision under that ID: iLive Monitor's request was
+  filed under iLive Touch or Electron. The build now gives iLive Monitor its own ID before signing, and the release
+  refuses an app that still has the stock one.
+
 ## [0.4.3] - 2026-09-27
 
 ### Fixed

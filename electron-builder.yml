@@ -40,4 +40,7 @@ dmg:
     - { x: 130, y: 220 }
     - { x: 410, y: 220, type: link, path: /Applications }
 # Releases go to whiteleyevents.co.uk via scripts/release-site.sh, not via electron-builder.
+# Give the executables their own Mach-O UUIDs before signing. Electron apps otherwise share one, and macOS's
+# Local Network privacy then files iLive Monitor under another Electron app: it never asks and never lists it.
+afterPack: scripts/unique-uuid.cjs
 publish: null

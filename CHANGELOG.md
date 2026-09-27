@@ -9,6 +9,8 @@ Add entries under **Unreleased** as you go; `npm run release:minor|patch|major` 
 
 ## [Unreleased]
 
+## [0.4.3] - 2026-09-27
+
 ### Fixed
 - The "not connected" banner no longer ends a sentence with "..".
 - The log file is called ilive-monitor.log (it was ilive-touch.log).
@@ -129,7 +131,8 @@ Add entries under **Unreleased** as you go; `npm run release:minor|patch|major` 
   - Licence registration and check-in, EULA and privacy notice, and update checks against
     whiteleyevents.co.uk (product `weim`).
 
-[Unreleased]: https://github.com/bernierainerguy/ilive-monitor/compare/v0.4.2...HEAD
+[Unreleased]: https://github.com/bernierainerguy/ilive-monitor/compare/v0.4.3...HEAD
+[0.4.3]: https://github.com/bernierainerguy/ilive-monitor/compare/v0.4.2...v0.4.3
 [0.4.2]: https://github.com/bernierainerguy/ilive-monitor/compare/v0.4.1...v0.4.2
 [0.4.1]: https://github.com/bernierainerguy/ilive-monitor/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/bernierainerguy/ilive-monitor/compare/v0.3.0...v0.4.0

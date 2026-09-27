@@ -46,12 +46,14 @@ describe('Read from rack', () => {
     expect(channels.getByText('Main R').parentElement).toHaveTextContent('FOH R');
     expect(screen.getByText(/FX sends on the rack: RVB R, RVB H/)).toBeInTheDocument();
 
-    const save = screen.getByRole('button', { name: 'Save' });
-    expect(save).toBeDisabled(); // groups and FX sends not yet checked
+    const saves = () => screen.getAllByRole('button', { name: 'Save' });
+    expect(saves().length).toBe(2); // the rack card's, and one beside the tick
+    expect(saves().every((b) => (b as HTMLButtonElement).disabled)).toBe(true); // groups and FX sends not yet checked
+    expect(screen.getByText('Tick the box to save.')).toBeInTheDocument();
     fireEvent.change(screen.getByLabelText('Mono fx sends'), { target: { value: '4' } });
     fireEvent.click(screen.getByLabelText(/I’ve checked the groups and FX sends/));
-    expect(save).toBeEnabled();
-    fireEvent.click(save);
+    expect(saves().every((b) => !(b as HTMLButtonElement).disabled)).toBe(true);
+    fireEvent.click(within(screen.getByRole('group', { name: 'Rack layout' })).getByRole('button', { name: 'Save' }));
     await waitFor(() => expect(be.settings.current.racks.find((r) => r.id === IDR48.id)?.mixConfig).toMatchObject({ monoAuxes: 4, stereoAuxes: 10, main: 'lr', monoFx: 4 }));
   });
 
@@ -62,6 +64,12 @@ describe('Read from rack', () => {
     fireEvent.change(screen.getByLabelText('Mono auxes'), { target: { value: '3' } });
     expect(await screen.findByText(/channels below don’t match the rack/)).toBeInTheDocument();
     expect(document.querySelectorAll('[data-mismatch]').length).toBeGreaterThan(10);
+  });
+
+  it('says when edits aren\'t saved yet', async () => {
+    await bootConnected();
+    fireEvent.change(screen.getByLabelText('IP address'), { target: { value: '10.0.0.11' } });
+    expect(await screen.findByText(/Not saved yet/)).toBeInTheDocument();
   });
 
   it('needs the rack connected, and Settings unlocked', async () => {

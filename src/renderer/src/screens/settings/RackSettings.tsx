@@ -46,6 +46,17 @@ export function RackSettings() {
       setConfirmed(false);
       if (reading.clean) setEditing({ ...editing, mixConfig: reading.config });
     });
+  // What's on screen differs from what's saved: say so, since nothing applies until Save.
+  const saved = targets.find((t) => t.id === editing?.id);
+  const dirty = !!editing && JSON.stringify(saved ?? null) !== JSON.stringify(editing);
+  const saveBlocked = !editing || awaitingCheck || !!(editing.mixConfig && mixConfigError(editing.mixConfig));
+  const save = () =>
+    void attempt(async () => {
+      if (!editing) return;
+      await invoke('rack:saveTarget', editing);
+      setMustConfirm(false);
+      notify('Saved', 'success');
+    });
   // A refused save (a bad port, or Settings locked meanwhile) says why instead of failing silently.
   const attempt = (fn: () => Promise<unknown>) =>
     fn().catch((e: Error) => notify(e.message.replace(/^Error invoking remote method '[^']+': (Error: )?/, ''), 'error'));
@@ -97,7 +108,7 @@ export function RackSettings() {
                 {editing.protocol === 'ilive-midi-tcp' && <MixConfigFields value={editing.mixConfig} onChange={(mixConfig) => setEditing({ ...editing, mixConfig })} />}
                 <FormControlLabel control={<Switch checked={editing.autoConnect} onChange={(_, v) => setEditing({ ...editing, autoConnect: v })} />} label="Reconnect on launch" />
                 <Stack direction="row" spacing={1}>
-                  <Button variant="contained" disabled={awaitingCheck || !!(editing.mixConfig && mixConfigError(editing.mixConfig))} onClick={() => void attempt(async () => { await invoke('rack:saveTarget', editing); notify('Saved', 'success'); })}>Save</Button>
+                  <Button variant="contained" disabled={saveBlocked} onClick={save}>Save</Button>
                   <Button color="error" onClick={() => void attempt(async () => { await invoke('rack:deleteTarget', { id: editing.id }); setEditing(null); })}>Delete</Button>
                 </Stack>
               </Stack>
@@ -127,6 +138,9 @@ export function RackSettings() {
             mustConfirm={mustConfirm}
             confirmed={confirmed}
             onConfirm={setConfirmed}
+            dirty={dirty}
+            canSave={!saveBlocked}
+            onSave={save}
           />
         )}
         <Table size="small" sx={{ maxWidth: 640 }}>
@@ -213,9 +227,9 @@ function MixConfigFields({ value, onChange }: { value: RackMixConfig | undefined
  * Read from rack, and the layout preview: what the mix configuration makes of each of the rack's 32 mix channels,
  * beside the name the rack gives it. Disagreements are marked, so a wrong number shows before anything is sent.
  */
-function RackLayout({ config, names, notes, canRead, onRead, mustConfirm, confirmed, onConfirm }: {
+function RackLayout({ config, names, notes, canRead, onRead, mustConfirm, confirmed, onConfirm, dirty, canSave, onSave }: {
   config: RackMixConfig | undefined; names: RackNames | null; notes: string[]; canRead: boolean; onRead(): void;
-  mustConfirm: boolean; confirmed: boolean; onConfirm(v: boolean): void;
+  mustConfirm: boolean; confirmed: boolean; onConfirm(v: boolean): void; dirty: boolean; canSave: boolean; onSave(): void;
 }) {
   const labels = config ? channelLabels(config) : null;
   const bad = new Set(config && names ? layoutMismatches(config, names.mixes) : []);
@@ -223,6 +237,11 @@ function RackLayout({ config, names, notes, canRead, onRead, mustConfirm, confir
   const rows = Math.max(used, labels ? labels.reduce((n, l, i) => (l !== '—' ? i + 1 : n), 0) : 0);
   return (
     <Box role="group" aria-label="Rack layout" sx={{ border: 1, borderColor: 'divider', borderRadius: 1, p: 1.5, maxWidth: 640 }}>
+      {dirty && !mustConfirm && (
+        <Alert severity="info" sx={{ mb: 1 }} action={<Button color="inherit" size="small" disabled={!canSave} onClick={onSave}>Save</Button>}>
+          Not saved yet: nothing reaches the rack until you save.
+        </Alert>
+      )}
       <Stack direction="row" spacing={1.5} alignItems="center" sx={{ mb: 1 }}>
         <Button variant="outlined" size="small" disabled={!canRead} onClick={onRead}>Read from rack</Button>
         <Typography variant="caption" color="text.secondary">
@@ -237,6 +256,11 @@ function RackLayout({ config, names, notes, canRead, onRead, mustConfirm, confir
             control={<Checkbox size="small" checked={confirmed} onChange={(_, v) => onConfirm(v)} />}
             label="I’ve checked the groups and FX sends against the rack’s Mixer Config"
           />
+          {/* Save here too, beside the tick that unlocks it: nothing applies to the rack until it's saved. */}
+          <Stack direction="row" spacing={1.5} alignItems="center" sx={{ mt: 0.5 }}>
+            <Button variant="contained" size="small" disabled={!canSave} onClick={onSave}>Save</Button>
+            <Typography variant="body2">{confirmed ? 'Saving reconnects with this configuration and unlocks the faders.' : 'Tick the box to save.'}</Typography>
+          </Stack>
         </Alert>
       )}
       {rows > 0 && (

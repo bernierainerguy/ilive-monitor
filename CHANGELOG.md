@@ -9,6 +9,11 @@ Add entries under **Unreleased** as you go; `npm run release:minor|patch|major` 
 
 ## [Unreleased]
 
+### Changed
+- Settings › Rack: a Save button right beside the "I've checked…" tick, and a "Not saved yet" note while the rack
+  on screen differs from the saved one. The only Save used to be at the bottom of the other column, so a
+  configuration read from the rack could be left unsaved, and lost at quit, without it being obvious.
+
 ## [0.5.1] - 2026-09-27
 
 ### Added

@@ -55,7 +55,7 @@ export function createFileSink(dir: string, opts: { maxBytes?: number; keep?: nu
   const maxBytes = opts.maxBytes ?? 10 * 1024 * 1024;
   const keep = opts.keep ?? 5;
   mkdirSync(dir, { recursive: true });
-  const file = join(dir, 'ilive-touch.log');
+  const file = join(dir, 'ilive-monitor.log');
   let written = existsSync(file) ? statSync(file).size : 0;
 
   const rotate = () => {

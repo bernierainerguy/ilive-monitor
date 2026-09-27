@@ -9,6 +9,10 @@ Add entries under **Unreleased** as you go; `npm run release:minor|patch|major` 
 
 ## [Unreleased]
 
+### Fixed
+- The "not connected" banner no longer ends a sentence with "..".
+- The log file is called ilive-monitor.log (it was ilive-touch.log).
+
 ## [0.4.2] - 2026-09-25
 
 ### Added

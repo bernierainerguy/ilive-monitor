@@ -104,7 +104,7 @@ function StatusBanner() {
   const go = onSettings ? undefined : <Button color="inherit" size="small" onClick={() => nav('/settings')}>Settings</Button>;
   const sx = { py: 0, borderRadius: 0 };
   if (rack.phase === 'reconnecting') {
-    return <Alert severity="error" sx={sx}>Not connected to the rack{rack.lastError ? `: ${rack.lastError}` : ''}. Retrying every 2 seconds; the faders are locked until it connects.</Alert>;
+    return <Alert severity="error" sx={sx}>Not connected to the rack{rack.lastError ? `: ${rack.lastError.replace(/\.+$/, '')}` : ''}. Retrying every 2 seconds; the faders are locked until it connects.</Alert>;
   }
   if (!live) {
     if (rack.phase === 'offline') return <Alert severity="info" sx={sx} action={go}>Not connected to a rack. The faders are locked until you connect in Settings.</Alert>;

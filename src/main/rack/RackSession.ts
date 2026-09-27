@@ -226,6 +226,8 @@ export class RackSession {
       this.bindProtocol(protocol);
       const isReconnect = this.everConnected;
       this.everConnected = true;
+      // A fresh connection starts with a clean watchdog: misses from the one that dropped mustn't carry over.
+      this._status.health.missedProbes = 0;
       // Mark everything unconfirmed before the link is exposed, so no stale level ever looks confirmed.
       this.markUnconfirmed(protocol);
       this.patch({ identity, capabilities: protocol.capabilities, lastError: null, phase: 'syncing' });
@@ -364,6 +366,9 @@ export class RackSession {
       });
     } catch {
       if (p !== this.protocol) return;
+      // While syncing, the rack is working through our own queries and answers the probe late. That isn't the
+      // link failing, and 'degraded' would count as live and unlock sends before the layout check is done.
+      if (this._status.phase === 'syncing') return;
       const missed = this._status.health.missedProbes + 1;
       this.patch({ health: { ...this._status.health, missedProbes: missed }, phase: 'degraded' });
       this.log.warn('network', `Watchdog: missed probe ${missed}/${this.o.maxMissedProbes}`);

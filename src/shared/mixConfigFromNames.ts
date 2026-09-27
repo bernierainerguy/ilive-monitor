@@ -86,6 +86,9 @@ export function suggestMixConfig(mixNames: Array<string | null>, current?: RackM
       : 'Every mix before the main is read as an aux. If some are groups, move them to Groups: the names can’t tell groups from auxes.',
     'Set the FX sends (mono and stereo) from the rack’s Mixer Config: they have no mix channels, so the names can’t show them.',
   );
+  if (stereoGroups || stereoAuxes || stereoMatrices) {
+    notes.push('Stereo mixes are read from two neighbouring channels with the same name. Two mono mixes that happen to share a name would read as one stereo mix: check the stereo counts too.');
+  }
   const error = mixConfigError(config);
   if (error) notes.push(error);
   return { config, clean: true, notes };

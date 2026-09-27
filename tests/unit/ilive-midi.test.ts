@@ -163,6 +163,21 @@ describe('IliveMidiProtocol over loopback', () => {
     p.close();
   });
 
+  it('two overlapping reads each get every answer', async () => {
+    const t = new LoopbackTransport();
+    t.peer.onReceive((b) => {
+      const s = parseIliveSysex([...b]);
+      if (s && s.cmd === 0x01) t.peer.send(nameReply(s.n, s.payload[0]!, `N${s.payload[0]!.toString(16)}`));
+    });
+    const p = new IliveMidiProtocol(t, { midiChannel: 0, rackName: 'R', queryTickMs: 0, queryTimeoutMs: 200 });
+    await p.open();
+    const [a, b] = await Promise.all([p.readRackNames(60), p.readRackNames(60)]);
+    expect(a.mixes.every((n) => n !== null)).toBe(true);
+    expect(b.mixes.every((n) => n !== null)).toBe(true);
+    expect(a.mixes[0]).toBe('N60');
+    p.close();
+  });
+
   it('asks silent channels again, so a busy rack\'s late answers aren\'t taken as unused', async () => {
     const t = new LoopbackTransport();
     const asked = new Map<number, number>();
@@ -194,9 +209,14 @@ describe('IliveMidiProtocol over loopback', () => {
     const p = new IliveMidiProtocol(t, { midiChannel: 0, rackName: 'x' });
     const opening = p.open();
     const assertion = expect(opening).rejects.toThrow(/No iLive MIDI response/);
-    await vi.advanceTimersByTimeAsync(1600);
-    await assertion;
-    vi.useRealTimers();
+    try {
+      await vi.advanceTimersByTimeAsync(1600);
+      expect(t.written.length).toBeGreaterThanOrEqual(2); // a second probe: the rack may still be busy
+      await vi.advanceTimersByTimeAsync(1600);
+      await assertion;
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('decodes inbound mute, fader and scene recall on its channel only, and ignores pan', async () => {

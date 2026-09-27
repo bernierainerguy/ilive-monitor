@@ -176,6 +176,32 @@ describe('RackSession over a protocol that cannot report state', () => {
     expect(ok.session.supports(send(ip(0), 5, 0))).toBe(true);
   });
 
+  it('a missed probe while still syncing neither counts nor unlocks sends before the layout check is done', async () => {
+    const rack = new SimulatedRack();
+    const cache = new StateCache(createDefaultMixerState(), 1);
+    let finishCheck!: () => void;
+    let proto!: SimulatorProtocol;
+    const session = new RackSession(cache, new Logger('error'), () => {
+      proto = new SimulatorProtocol(rack, { meterFps: 0 });
+      Object.defineProperty(proto, 'capabilities', { value: { ...SIMULATOR_CAPABILITIES, stateQuery: 'partial' } });
+      // A slow rack: the name read behind the layout check takes a while.
+      Object.defineProperty(proto, 'readRackNames', { value: () => new Promise((r) => (finishCheck = () => r(rackNamesFor(MONITOR_RACK)))) });
+      return proto;
+    }, { bus: () => 5 });
+    session.connect(target);
+    await vi.waitFor(() => expect(session.current.phase).toBe('syncing'));
+    proto.hung = true;
+    await vi.advanceTimersByTimeAsync(5 * 1750); // several probes miss while the check waits
+    expect(session.current.phase).toBe('syncing');
+    expect(session.current.health.missedProbes).toBe(0);
+    expect(session.supports(send(ip(0), 5, 0))).toBe(false);
+    proto.hung = false;
+    finishCheck();
+    await vi.waitFor(() => expect(session.current.phase).toBe('online'));
+    expect(session.supports(send(ip(0), 5, 0))).toBe(true);
+    session.dispose();
+  });
+
   it('a failed check locks sends rather than trusting the configuration', async () => {
     const rack = new SimulatedRack();
     const cache = new StateCache(createDefaultMixerState(), 1);

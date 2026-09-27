@@ -111,6 +111,23 @@ describe('RackSession', () => {
     expect(c.session.current.lastError).toMatch(/watchdog/);
   });
 
+  it('a reconnect after the watchdog dropped the link starts with a clean miss count', async () => {
+    const rack = new SimulatedRack();
+    const c = client(rack);
+    await online(c);
+    c.last().hung = true;
+    await vi.advanceTimersByTimeAsync(3 * 1750);
+    expect(c.session.current.phase).toBe('reconnecting');
+    await vi.advanceTimersByTimeAsync(2000); // the 2 s reconnect: a new, healthy protocol
+    await vi.waitFor(() => expect(c.session.current.phase).toBe('online'));
+    expect(c.session.current.health.missedProbes).toBe(0);
+    c.last().hung = true; // one slow answer on the new link…
+    await vi.advanceTimersByTimeAsync(1750);
+    expect(c.session.current.phase).toBe('degraded'); // …is one miss, not the fourth of the old link's three
+    expect(c.protocols.length).toBe(2);
+    c.session.dispose();
+  });
+
   it('disconnect stops reconnecting', async () => {
     const rack = new SimulatedRack();
     const c = client(rack, { refuse: () => true });

@@ -93,8 +93,8 @@ export class IliveMidiProtocol implements MixRackProtocol {
   private bank = 0;
   private probeWaiters: Array<() => void> = [];
   private pendingQueries = new Set<string>();
-  /** readRackNames: raw name replies by channel, whatever the layout. */
-  private rawNames: Map<number, string> | null = null;
+  /** readRackNames calls in progress: each collects the raw name replies for the channels it asked about. */
+  private readonly nameReads = new Set<(ch: number, name: string) => void>();
   private queryDone: (() => void) | null = null;
   private unsubs: Array<() => void> = [];
 
@@ -125,8 +125,9 @@ export class IliveMidiProtocol implements MixRackProtocol {
       }),
     );
     try {
-      // The MIDI protocol has no identity query; a name round-trip proves a live iLive is listening.
-      await this.probe(1500);
+      // The MIDI protocol has no identity query; a name round-trip proves a live iLive is listening. Twice:
+      // straight after a reconnect the rack can still be answering the previous connection's queries.
+      await this.probe(1500).catch(() => this.probe(1500));
     } catch (err) {
       this.close();
       throw new Error(`No iLive MIDI response from ${this.transport.remoteAddress}. Check MIDI channel and that TCP MIDI is enabled on the MixRack.`, { cause: err });
@@ -302,8 +303,12 @@ export class IliveMidiProtocol implements MixRackProtocol {
     const mixCh = Array.from({ length: IDR48.mixBuses }, (_, i) => CHANNEL_BASE.mix + i);
     const fxCh = Array.from({ length: IDR48.fxUnits }, (_, i) => CHANNEL_BASE.fxSend + i);
     const all = [...mixCh, ...fxCh];
+    const asked = new Set(all);
+    // This call's own replies, for its own channels only: an overlapping read, the watchdog's probe or a pull
+    // can't end its wait early or take its answers.
     const got = new Map<number, string>();
-    this.rawNames = got;
+    const take = (ch: number, name: string) => void (asked.has(ch) && got.set(ch, name));
+    this.nameReads.add(take);
     const ask = async (channels: number[]) => {
       const tick = this.opts.queryTickMs ?? 10;
       for (let i = 0; i < channels.length; i += 8) {
@@ -320,7 +325,7 @@ export class IliveMidiProtocol implements MixRackProtocol {
       const silent = all.filter((ch) => !got.has(ch));
       if (silent.length) await ask(silent);
     } finally {
-      this.rawNames = null;
+      this.nameReads.delete(take);
     }
     return { mixes: mixCh.map((ch) => got.get(ch) ?? null), fx: fxCh.map((ch) => got.get(ch) ?? null) };
   }
@@ -400,7 +405,7 @@ export class IliveMidiProtocol implements MixRackProtocol {
         }
         // The rack pads names to 8 characters with NULs.
         const name = String.fromCharCode(...rest).replace(/\0/g, '').trimEnd();
-        this.rawNames?.set(ch, name);
+        this.nameReads.forEach((take) => take(ch, name));
         const s = this.stripOf(ch);
         if (s?.primary) this.changes.emit({ t: 'name', strip: s.ref, name });
         this.settleQuery(`n:${ch}`);

@@ -35,16 +35,18 @@ export function RackSettings() {
   }, [editing?.id]);
   // After a read, nothing is saved until groups and FX sends have been checked: a wrong guess misroutes every send.
   const awaitingCheck = mustConfirm && !confirmed;
+  const [reading, setReading] = useState(false);
   const readFromRack = () =>
     void attempt(async () => {
-      if (!editing) return;
-      const read = await invoke('rack:readNames', { targetId: editing.id });
-      const reading = suggestMixConfig(read.mixes, editing.mixConfig);
+      if (!editing || reading) return;
+      setReading(true);
+      const read = await invoke('rack:readNames', { targetId: editing.id }).finally(() => setReading(false));
+      const suggestion = suggestMixConfig(read.mixes, editing.mixConfig);
       setNames(read);
-      setNotes(reading.notes);
+      setNotes(suggestion.notes);
       setMustConfirm(true);
       setConfirmed(false);
-      if (reading.clean) setEditing({ ...editing, mixConfig: reading.config });
+      if (suggestion.clean) setEditing({ ...editing, mixConfig: suggestion.config });
     });
   // What's on screen differs from what's saved: say so, since nothing applies until Save.
   const saved = targets.find((t) => t.id === editing?.id);
@@ -133,7 +135,8 @@ export function RackSettings() {
             config={editing.mixConfig}
             names={names}
             notes={notes}
-            canRead={connected}
+            canRead={connected && !reading}
+            reading={reading}
             onRead={readFromRack}
             mustConfirm={mustConfirm}
             confirmed={confirmed}
@@ -227,8 +230,8 @@ function MixConfigFields({ value, onChange }: { value: RackMixConfig | undefined
  * Read from rack, and the layout preview: what the mix configuration makes of each of the rack's 32 mix channels,
  * beside the name the rack gives it. Disagreements are marked, so a wrong number shows before anything is sent.
  */
-function RackLayout({ config, names, notes, canRead, onRead, mustConfirm, confirmed, onConfirm, dirty, canSave, onSave }: {
-  config: RackMixConfig | undefined; names: RackNames | null; notes: string[]; canRead: boolean; onRead(): void;
+function RackLayout({ config, names, notes, canRead, reading, onRead, mustConfirm, confirmed, onConfirm, dirty, canSave, onSave }: {
+  config: RackMixConfig | undefined; names: RackNames | null; notes: string[]; canRead: boolean; reading: boolean; onRead(): void;
   mustConfirm: boolean; confirmed: boolean; onConfirm(v: boolean): void; dirty: boolean; canSave: boolean; onSave(): void;
 }) {
   const labels = config ? channelLabels(config) : null;
@@ -243,7 +246,7 @@ function RackLayout({ config, names, notes, canRead, onRead, mustConfirm, confir
         </Alert>
       )}
       <Stack direction="row" spacing={1.5} alignItems="center" sx={{ mb: 1 }}>
-        <Button variant="outlined" size="small" disabled={!canRead} onClick={onRead}>Read from rack</Button>
+        <Button variant="outlined" size="small" disabled={!canRead} onClick={onRead}>{reading ? 'Reading…' : 'Read from rack'}</Button>
         <Typography variant="caption" color="text.secondary">
           {canRead ? 'Reads the rack’s mix names and fills in the mix configuration they show. Nothing on the rack changes.' : 'Connect to this rack first: the names come from the rack.'}
         </Typography>

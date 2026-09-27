@@ -9,6 +9,23 @@ Add entries under **Unreleased** as you go; `npm run release:minor|patch|major` 
 
 ## [Unreleased]
 
+### Fixed
+- A probe missed while the app was still reading from the rack (which happens on most connects, because the rack is
+  busy answering the app's own queries) marked the link "degraded", which counts as live. So sends were accepted
+  before the on-connect mix configuration check had finished. Misses while syncing no longer count or unlock
+  anything.
+- After the watchdog dropped the link, the reconnect started with the old miss count, so its first slow answer
+  dropped the link again, which could repeat. Each connection now starts clean.
+- Two overlapping reads of the rack's names (the connect check and Read from rack, or a double-click) could take
+  each other's answers or stop waiting early, so used channels looked unused. Each read now keeps its own
+  answers, and Read from rack is disabled while it runs.
+- Straight after a reconnect, the rack can still be answering the previous connection's queries, so connecting
+  failed with "No iLive MIDI response". Connecting now tries the rack twice.
+
+### Changed
+- Read from rack says that stereo mixes are read from two neighbouring channels with the same name, so two mono
+  mixes that share a name should be checked.
+
 ## [0.5.3] - 2026-09-27
 
 ### Fixed

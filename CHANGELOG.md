@@ -9,6 +9,8 @@ Add entries under **Unreleased** as you go; `npm run release:minor|patch|major` 
 
 ## [Unreleased]
 
+## [0.4.4] - 2026-09-27
+
 ### Fixed
 - macOS never asked to let iLive Monitor onto the local network, and never listed it under Privacy & Security ›
   Local Network, so it couldn't reach the rack. Every Electron app built on the same Electron version shares one
@@ -138,7 +140,8 @@ Add entries under **Unreleased** as you go; `npm run release:minor|patch|major` 
   - Licence registration and check-in, EULA and privacy notice, and update checks against
     whiteleyevents.co.uk (product `weim`).
 
-[Unreleased]: https://github.com/bernierainerguy/ilive-monitor/compare/v0.4.3...HEAD
+[Unreleased]: https://github.com/bernierainerguy/ilive-monitor/compare/v0.4.4...HEAD
+[0.4.4]: https://github.com/bernierainerguy/ilive-monitor/compare/v0.4.3...v0.4.4
 [0.4.3]: https://github.com/bernierainerguy/ilive-monitor/compare/v0.4.2...v0.4.3
 [0.4.2]: https://github.com/bernierainerguy/ilive-monitor/compare/v0.4.1...v0.4.2
 [0.4.1]: https://github.com/bernierainerguy/ilive-monitor/compare/v0.4.0...v0.4.1

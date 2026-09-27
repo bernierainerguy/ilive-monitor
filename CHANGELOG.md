@@ -9,6 +9,8 @@ Add entries under **Unreleased** as you go; `npm run release:minor|patch|major` 
 
 ## [Unreleased]
 
+## [0.5.4] - 2026-09-27
+
 ### Fixed
 - A probe missed while the app was still reading from the rack (which happens on most connects, because the rack is
   busy answering the app's own queries) marked the link "degraded", which counts as live. So sends were accepted
@@ -192,7 +194,8 @@ Add entries under **Unreleased** as you go; `npm run release:minor|patch|major` 
   - Licence registration and check-in, EULA and privacy notice, and update checks against
     whiteleyevents.co.uk (product `weim`).
 
-[Unreleased]: https://github.com/bernierainerguy/ilive-monitor/compare/v0.5.3...HEAD
+[Unreleased]: https://github.com/bernierainerguy/ilive-monitor/compare/v0.5.4...HEAD
+[0.5.4]: https://github.com/bernierainerguy/ilive-monitor/compare/v0.5.3...v0.5.4
 [0.5.3]: https://github.com/bernierainerguy/ilive-monitor/compare/v0.5.2...v0.5.3
 [0.5.2]: https://github.com/bernierainerguy/ilive-monitor/compare/v0.5.1...v0.5.2
 [0.5.1]: https://github.com/bernierainerguy/ilive-monitor/compare/v0.5.0...v0.5.1

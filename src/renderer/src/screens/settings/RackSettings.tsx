@@ -1,8 +1,10 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   Alert, Box, Button, Card, CardContent, FormControlLabel, List, ListItemButton, ListItemText, MenuItem, Select, Stack, Switch, Table, TableBody, TableCell, TableRow, TextField, ToggleButton,
-  ToggleButtonGroup, Typography,
+  ToggleButtonGroup, Typography, Checkbox,
 } from '@mui/material';
+import type { RackNames } from '@shared/rack';
+import { channelLabels, layoutMismatches, suggestMixConfig } from '@shared/mixConfigFromNames';
 import { MIX_CHANNELS, SEND_BUSES, mixChannelCount, mixConfigError, sendBusCount, type RackMixConfig } from '@shared/mixLayout';
 import type { RackTarget } from '@shared/settings';
 import { invoke } from '../../api/bridge';
@@ -20,6 +22,30 @@ export function RackSettings() {
   const [editing, setEditing] = useState<RackTarget | null>(() => targets.find((x) => x.id === rack.targetId) ?? targets[0] ?? null);
   // Already on this rack: Connect would only drop the link (Save applies an edited address or configuration).
   const connected = !!editing && rack.targetId === editing.id && (rack.phase === 'online' || rack.phase === 'degraded');
+  // Read from rack: the rack's own names, what they suggest, and the operator's confirmation of what they can't show.
+  const [names, setNames] = useState<RackNames | null>(null);
+  const [notes, setNotes] = useState<string[]>([]);
+  const [mustConfirm, setMustConfirm] = useState(false);
+  const [confirmed, setConfirmed] = useState(false);
+  useEffect(() => {
+    setNames(null);
+    setNotes([]);
+    setMustConfirm(false);
+    setConfirmed(false);
+  }, [editing?.id]);
+  // After a read, nothing is saved until groups and FX sends have been checked: a wrong guess misroutes every send.
+  const awaitingCheck = mustConfirm && !confirmed;
+  const readFromRack = () =>
+    void attempt(async () => {
+      if (!editing) return;
+      const read = await invoke('rack:readNames', { targetId: editing.id });
+      const reading = suggestMixConfig(read.mixes, editing.mixConfig);
+      setNames(read);
+      setNotes(reading.notes);
+      setMustConfirm(true);
+      setConfirmed(false);
+      if (reading.clean) setEditing({ ...editing, mixConfig: reading.config });
+    });
   // A refused save (a bad port, or Settings locked meanwhile) says why instead of failing silently.
   const attempt = (fn: () => Promise<unknown>) =>
     fn().catch((e: Error) => notify(e.message.replace(/^Error invoking remote method '[^']+': (Error: )?/, ''), 'error'));
@@ -71,7 +97,7 @@ export function RackSettings() {
                 {editing.protocol === 'ilive-midi-tcp' && <MixConfigFields value={editing.mixConfig} onChange={(mixConfig) => setEditing({ ...editing, mixConfig })} />}
                 <FormControlLabel control={<Switch checked={editing.autoConnect} onChange={(_, v) => setEditing({ ...editing, autoConnect: v })} />} label="Reconnect on launch" />
                 <Stack direction="row" spacing={1}>
-                  <Button variant="contained" disabled={!!(editing.mixConfig && mixConfigError(editing.mixConfig))} onClick={() => void attempt(async () => { await invoke('rack:saveTarget', editing); notify('Saved', 'success'); })}>Save</Button>
+                  <Button variant="contained" disabled={awaitingCheck || !!(editing.mixConfig && mixConfigError(editing.mixConfig))} onClick={() => void attempt(async () => { await invoke('rack:saveTarget', editing); notify('Saved', 'success'); })}>Save</Button>
                   <Button color="error" onClick={() => void attempt(async () => { await invoke('rack:deleteTarget', { id: editing.id }); setEditing(null); })}>Delete</Button>
                 </Stack>
               </Stack>
@@ -81,7 +107,7 @@ export function RackSettings() {
       </Stack>
       <Stack spacing={2}>
         <Stack direction="row" spacing={1}>
-          <Button variant="contained" disabled={!editing || connected || !!(editing.mixConfig && mixConfigError(editing.mixConfig))} onClick={() => void attempt(async () => { if (!editing) return; await invoke('rack:saveTarget', editing); await invoke('rack:connect', { targetId: editing.id }); })}>
+          <Button variant="contained" disabled={!editing || connected || awaitingCheck || !!(editing.mixConfig && mixConfigError(editing.mixConfig))} onClick={() => void attempt(async () => { if (!editing) return; await invoke('rack:saveTarget', editing); await invoke('rack:connect', { targetId: editing.id }); })}>
             {connected ? 'Connected' : 'Connect'}{editing ? ` to ${editing.name}` : ''}
           </Button>
           <Button disabled={rack.phase === 'offline'} onClick={() => void attempt(() => invoke('rack:disconnect', undefined))}>Disconnect</Button>
@@ -90,6 +116,18 @@ export function RackSettings() {
           <Alert severity="warning" sx={{ maxWidth: 640 }} action={<Button color="inherit" size="small" onClick={() => invoke('rack:openLocalNetworkSettings', undefined)}>Open settings</Button>}>
             macOS may be blocking iLive Monitor from the local network. Turn iLive Monitor on under Privacy &amp; Security › Local Network, then quit and reopen the app.
           </Alert>
+        )}
+        {editing?.protocol === 'ilive-midi-tcp' && (
+          <RackLayout
+            config={editing.mixConfig}
+            names={names}
+            notes={notes}
+            canRead={connected}
+            onRead={readFromRack}
+            mustConfirm={mustConfirm}
+            confirmed={confirmed}
+            onConfirm={setConfirmed}
+          />
         )}
         <Table size="small" sx={{ maxWidth: 640 }}>
           <TableBody>
@@ -166,6 +204,61 @@ function MixConfigFields({ value, onChange }: { value: RackMixConfig | undefined
             </Typography>
           )}
         </Stack>
+      )}
+    </Box>
+  );
+}
+
+/**
+ * Read from rack, and the layout preview: what the mix configuration makes of each of the rack's 32 mix channels,
+ * beside the name the rack gives it. Disagreements are marked, so a wrong number shows before anything is sent.
+ */
+function RackLayout({ config, names, notes, canRead, onRead, mustConfirm, confirmed, onConfirm }: {
+  config: RackMixConfig | undefined; names: RackNames | null; notes: string[]; canRead: boolean; onRead(): void;
+  mustConfirm: boolean; confirmed: boolean; onConfirm(v: boolean): void;
+}) {
+  const labels = config ? channelLabels(config) : null;
+  const bad = new Set(config && names ? layoutMismatches(config, names.mixes) : []);
+  const used = names ? names.mixes.reduce((n, x, i) => (x !== null ? i + 1 : n), 0) : 0;
+  const rows = Math.max(used, labels ? labels.reduce((n, l, i) => (l !== '—' ? i + 1 : n), 0) : 0);
+  return (
+    <Box role="group" aria-label="Rack layout" sx={{ border: 1, borderColor: 'divider', borderRadius: 1, p: 1.5, maxWidth: 640 }}>
+      <Stack direction="row" spacing={1.5} alignItems="center" sx={{ mb: 1 }}>
+        <Button variant="outlined" size="small" disabled={!canRead} onClick={onRead}>Read from rack</Button>
+        <Typography variant="caption" color="text.secondary">
+          {canRead ? 'Reads the rack’s mix names and fills in the mix configuration they show. Nothing on the rack changes.' : 'Connect to this rack first: the names come from the rack.'}
+        </Typography>
+      </Stack>
+      {mustConfirm && (
+        <Alert severity={bad.size ? 'error' : 'warning'} sx={{ mb: 1 }}>
+          {notes.map((n) => <Typography key={n} variant="body2" sx={{ mb: 0.5 }}>{n}</Typography>)}
+          {bad.size > 0 && <Typography variant="body2" sx={{ fontWeight: 700 }}>{bad.size} channel{bad.size === 1 ? '' : 's'} below don’t match the rack.</Typography>}
+          <FormControlLabel
+            control={<Checkbox size="small" checked={confirmed} onChange={(_, v) => onConfirm(v)} />}
+            label="I’ve checked the groups and FX sends against the rack’s Mixer Config"
+          />
+        </Alert>
+      )}
+      {rows > 0 && (
+        <Box aria-label="Mix channels" sx={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', columnGap: 2, rowGap: '2px', gridAutoFlow: 'column', gridTemplateRows: `repeat(${Math.ceil(rows / 2)}, auto)` }}>
+          {Array.from({ length: rows }, (_, i) => (
+            <Typography
+              key={i}
+              variant="body2"
+              data-mismatch={bad.has(i) || undefined}
+              sx={{ fontVariantNumeric: 'tabular-nums', color: bad.has(i) ? 'error.main' : undefined, fontWeight: bad.has(i) ? 700 : 400 }}
+            >
+              <Box component="span" sx={{ color: 'text.secondary', display: 'inline-block', width: 52 }}>Mix {i + 1}</Box>
+              <Box component="span" sx={{ display: 'inline-block', width: 88 }}>{labels?.[i] ?? '—'}</Box>
+              {names ? (names.mixes[i] ?? <Box component="span" sx={{ color: 'text.secondary' }}>not used</Box>) : ''}
+            </Typography>
+          ))}
+        </Box>
+      )}
+      {names && (
+        <Typography variant="caption" color="text.secondary" component="p" sx={{ mt: 1 }}>
+          FX sends on the rack: {names.fx.map((f, i) => f ?? `${i + 1} (not used)`).join(', ')}
+        </Typography>
       )}
     </Box>
   );

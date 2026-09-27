@@ -4,7 +4,7 @@ import type { LogEntry } from './log';
 import type { UpdateState } from './update';
 import type { LegalView, LicenceRegistration, LicenceView } from './licence';
 import type { LockStatus } from './lock';
-import type { RackStatus } from './rack';
+import type { RackNames, RackStatus } from './rack';
 import type { MonitorSettings, RackTarget } from './settings';
 
 /**
@@ -27,6 +27,8 @@ export interface IpcInvokeMap {
   'rack:status': { req: void; res: RackStatus };
   'rack:saveTarget': { req: RackTarget; res: void };
   'rack:deleteTarget': { req: { id: string }; res: void };
+  /** Read-only: what the connected rack calls its 32 mix channels and 8 FX sends. */
+  'rack:readNames': { req: { targetId: string }; res: RackNames };
   /** macOS: open System Settings at Privacy & Security › Local Network. */
   'rack:openLocalNetworkSettings': { req: void; res: void };
 
@@ -75,7 +77,7 @@ export type EventChannel = keyof IpcEventMap;
 
 export const INVOKE_CHANNELS: readonly InvokeChannel[] = [
   'mixer:snapshot', 'mixer:dispatch',
-  'rack:connect', 'rack:disconnect', 'rack:status', 'rack:saveTarget', 'rack:deleteTarget', 'rack:openLocalNetworkSettings',
+  'rack:connect', 'rack:disconnect', 'rack:status', 'rack:saveTarget', 'rack:deleteTarget', 'rack:readNames', 'rack:openLocalNetworkSettings',
   'settings:get', 'settings:update', 'lock:status', 'lock:unlock', 'lock:lock', 'lock:setPassword',
   'update:status', 'update:check', 'update:download', 'update:openInstaller', 'update:reveal', 'update:openPage', 'update:dismiss',
   'licence:status', 'licence:register', 'licence:checkin', 'legal:status', 'legal:accept', 'legal:decline',

@@ -1,7 +1,7 @@
 import type { MixerChange } from '@shared/domain/changes';
-import type { SendTarget, StripRef } from '@shared/domain/ids';
+import { IDR48, type SendTarget, type StripRef } from '@shared/domain/ids';
 import type { MixerState } from '@shared/domain/model';
-import type { ProtocolCapabilities, RackIdentity } from '@shared/rack';
+import type { ProtocolCapabilities, RackIdentity, RackNames } from '@shared/rack';
 import { mixLayout, type MixLayout, type RackMixConfig } from '@shared/mixLayout';
 import type { MixRackProtocol } from '../MixRackProtocol';
 import { Emitter, type Transport } from '../../transport/Transport';
@@ -93,6 +93,8 @@ export class IliveMidiProtocol implements MixRackProtocol {
   private bank = 0;
   private probeWaiters: Array<() => void> = [];
   private pendingQueries = new Set<string>();
+  /** readRackNames: raw name replies by channel, whatever the layout. */
+  private rawNames: Map<number, string> | null = null;
   private queryDone: (() => void) | null = null;
   private unsubs: Array<() => void> = [];
 
@@ -291,6 +293,32 @@ export class IliveMidiProtocol implements MixRackProtocol {
     this.queryDone = null;
   }
 
+  /**
+   * The names of all 32 mix channels and 8 FX sends, straight from the rack. Read-only: the same query as a
+   * connect makes. A channel that doesn't answer within the wait isn't in the rack's mix configuration.
+   */
+  async readRackNames(waitMs = 1500): Promise<RackNames> {
+    const mixCh = Array.from({ length: IDR48.mixBuses }, (_, i) => CHANNEL_BASE.mix + i);
+    const fxCh = Array.from({ length: IDR48.fxUnits }, (_, i) => CHANNEL_BASE.fxSend + i);
+    const all = [...mixCh, ...fxCh];
+    const got = new Map<number, string>();
+    this.rawNames = got;
+    try {
+      const tick = this.opts.queryTickMs ?? 10;
+      for (let i = 0; i < all.length; i += 8) {
+        if (this.transport.state !== 'open') throw new Error('connection lost');
+        for (const ch of all.slice(i, i + 8)) this.transport.write(Uint8Array.from(encodeGetName(this.n, ch)));
+        await new Promise((r) => setTimeout(r, tick));
+      }
+      // Unused channels never answer, so wait out the window rather than for every reply.
+      const until = Date.now() + waitMs;
+      while (got.size < all.length && Date.now() < until) await new Promise((r) => setTimeout(r, 25));
+    } finally {
+      this.rawNames = null;
+    }
+    return { mixes: mixCh.map((ch) => got.get(ch) ?? null), fx: fxCh.map((ch) => got.get(ch) ?? null) };
+  }
+
   onChange(cb: (c: MixerChange) => void) {
     return this.changes.on(cb);
   }
@@ -365,8 +393,10 @@ export class IliveMidiProtocol implements MixRackProtocol {
           waiters.forEach((w) => w());
         }
         // The rack pads names to 8 characters with NULs.
+        const name = String.fromCharCode(...rest).replace(/\0/g, '').trimEnd();
+        this.rawNames?.set(ch, name);
         const s = this.stripOf(ch);
-        if (s?.primary) this.changes.emit({ t: 'name', strip: s.ref, name: String.fromCharCode(...rest).replace(/\0/g, '').trimEnd() });
+        if (s?.primary) this.changes.emit({ t: 'name', strip: s.ref, name });
         this.settleQuery(`n:${ch}`);
         return;
       }

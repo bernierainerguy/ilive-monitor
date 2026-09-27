@@ -9,6 +9,15 @@ Add entries under **Unreleased** as you go; `npm run release:minor|patch|major` 
 
 ## [Unreleased]
 
+### Added
+- **Read from rack** in Settings › Rack. It reads what the connected iDR48 calls each of its 32 mix channels and
+  8 FX sends, and fills in the mix configuration from them: mono and stereo mixes (a stereo mix's halves share a
+  name), where the main is, matrices, and which channels are unused. Nothing on the rack changes.
+  - The names can't show groups from auxes, or the FX sends. Save stays off until you tick that you've checked
+    both against the rack's Mixer Config, because a wrong number sends every level to the wrong aux.
+- A layout preview beside the mix configuration: each rack mix channel, what the configuration makes of it
+  ("Aux 5 L"), and the rack's own name for it. Channels where the two disagree are marked in red.
+
 ## [0.4.4] - 2026-09-27
 
 ### Fixed

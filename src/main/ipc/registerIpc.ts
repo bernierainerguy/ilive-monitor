@@ -88,6 +88,10 @@ export function registerIpc(d: IpcDeps) {
     if (d.session.current.targetId === id) d.session.disconnect();
     d.settings.deleteRack(id);
   });
+  handle('rack:readNames', ({ targetId }) => {
+    unlocked(); // it's part of editing the rack in Settings
+    return d.session.readRackNames(targetId);
+  });
   handle('rack:openLocalNetworkSettings', async () => {
     await d.openExternal?.(LOCAL_NETWORK_SETTINGS);
   });

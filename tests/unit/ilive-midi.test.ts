@@ -143,6 +143,26 @@ describe('IliveMidiProtocol over loopback', () => {
     expect(p.normaliseLevel(-Infinity)).toBe(-Infinity);
   });
 
+  it('reads the rack\'s raw mix and FX send names; channels that don\'t answer are unused', async () => {
+    const t = new LoopbackTransport();
+    const rackNames: Record<number, string> = { 0x60: 'ComOut', 0x64: 'Gtr', 0x65: 'Gtr', 0x00: 'RVB R' };
+    t.peer.onReceive((b) => {
+      const s = parseIliveSysex([...b]);
+      if (s && s.cmd === 0x01) {
+        const ch = s.payload[0]!;
+        if (ch === 0x20 || rackNames[ch]) t.peer.send(nameReply(s.n, ch, rackNames[ch] ?? 'Ip1')); // 0x20: the connect probe
+      }
+    });
+    const p = new IliveMidiProtocol(t, { midiChannel: 0, rackName: 'R', queryTickMs: 0, queryTimeoutMs: 200 });
+    await p.open();
+    const names = await p.readRackNames(100);
+    expect(names.mixes).toHaveLength(32);
+    expect(names.mixes.slice(0, 6)).toEqual(['ComOut', null, null, null, 'Gtr', 'Gtr']);
+    expect(names.fx[0]).toBe('RVB R');
+    expect(names.fx[1]).toBeNull();
+    p.close();
+  });
+
   it('opens by proving the rack answers', async () => {
     const { p } = setup();
     await expect(p.open()).resolves.toMatchObject({ name: 'FOH Rack', model: 'iDR48', ip: 'loopback' });

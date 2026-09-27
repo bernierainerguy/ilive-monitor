@@ -1,6 +1,6 @@
 import type { MixerChange } from '@shared/domain/changes';
 import type { MixerState } from '@shared/domain/model';
-import type { ProtocolCapabilities, RackIdentity } from '@shared/rack';
+import type { ProtocolCapabilities, RackIdentity, RackNames } from '@shared/rack';
 
 /**
  * Protocol layer contract. A protocol turns MixerChanges into wire traffic and
@@ -37,6 +37,8 @@ export interface MixRackProtocol {
    * answers in via `onChange`. Resolves once outstanding queries have settled.
    */
   requestState(current: MixerState): Promise<void>;
+  /** The rack's raw mix-channel and FX-send names (see RackNames). Absent: the protocol can't ask. */
+  readRackNames?(): Promise<RackNames>;
 
   onChange(cb: (change: MixerChange) => void): () => void;
   onMeters(cb: (frame: Float32Array) => void): () => void;

@@ -9,6 +9,7 @@ import {
   emptyHealth,
   unconfirmedSendKey,
   type ConnectionPhase,
+  type RackNames,
   type RackStatus,
 } from '@shared/rack';
 import type { RackTarget } from '@shared/settings';
@@ -113,6 +114,14 @@ export class RackSession {
   /** The level the rack will hold for `db`, after its rounding (see MixRackProtocol.normaliseLevel). */
   normaliseLevel(db: number): number {
     return this.protocol?.normaliseLevel?.(db) ?? db;
+  }
+
+  /** What the connected rack calls its mix channels and FX sends (Settings › Rack › Read from rack). */
+  async readRackNames(targetId: string): Promise<RackNames> {
+    const p = this.protocol;
+    if (!p || this._status.targetId !== targetId || !this.isLive) throw new Error('Connect to this rack first: the names come from the rack itself.');
+    if (!p.readRackNames) throw new Error('This connection can\'t read names from the rack.');
+    return p.readRackNames();
   }
 
   /** Already connected, or connecting, to this rack: a second Connect would only drop the link and start again. */

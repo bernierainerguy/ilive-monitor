@@ -2,7 +2,7 @@ import { applyChange, diffMixerState, type MixerChange } from '@shared/domain/ch
 import { createDefaultMixerState } from '@shared/domain/defaults';
 import type { MixerState } from '@shared/domain/model';
 import { METER_FLOOR_DB, METER_LAYOUT, createMeterFrame } from '@shared/meters';
-import type { ProtocolCapabilities, RackIdentity } from '@shared/rack';
+import type { ProtocolCapabilities, RackIdentity, RackNames } from '@shared/rack';
 import type { MixRackProtocol } from '../MixRackProtocol';
 import { Emitter } from '../../transport/Transport';
 
@@ -113,6 +113,13 @@ export class SimulatorProtocol implements MixRackProtocol {
   async requestState(current: MixerState): Promise<void> {
     await this.delay();
     for (const c of diffMixerState(current, this.rack.state)) this.changes.emit(c);
+  }
+
+  /** The virtual rack's names, one channel per mix (its mixes are all mono) and null for unused ones. */
+  async readRackNames(): Promise<RackNames> {
+    await this.delay();
+    const s = this.rack.state;
+    return { mixes: s.mixes.map((m) => (m.role === 'unused' ? null : m.name)), fx: s.fxSends.map((f) => f.name) };
   }
 
   onChange(cb: (c: MixerChange) => void) {

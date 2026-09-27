@@ -64,6 +64,15 @@ export interface RackStatus {
   unconfirmed: string[];
 }
 
+/**
+ * What the rack calls its 32 mix channels (CH 60..7F, in the rack's own order) and 8 FX sends, whatever mix
+ * configuration the app has. `null`: the rack didn't answer, which on an iDR48 means that channel isn't used.
+ */
+export interface RackNames {
+  mixes: Array<string | null>;
+  fx: Array<string | null>;
+}
+
 export const unconfirmedSendKey = (strip: StripRef, bus: number): string => `send:${stripKey(strip)}>mix:${bus}`;
 
 export const emptyHealth = (): ConnectionHealth => ({

@@ -9,6 +9,8 @@ Add entries under **Unreleased** as you go; `npm run release:minor|patch|major` 
 
 ## [Unreleased]
 
+## [0.5.3] - 2026-09-27
+
 ### Fixed
 - The on-connect check of the mix configuration could lock the faders when nothing was wrong. It ran after the
   full pull from the rack (hundreds of queries), so the rack's last few name answers came in too late and those
@@ -173,7 +175,8 @@ Add entries under **Unreleased** as you go; `npm run release:minor|patch|major` 
   - Licence registration and check-in, EULA and privacy notice, and update checks against
     whiteleyevents.co.uk (product `weim`).
 
-[Unreleased]: https://github.com/bernierainerguy/ilive-monitor/compare/v0.5.2...HEAD
+[Unreleased]: https://github.com/bernierainerguy/ilive-monitor/compare/v0.5.3...HEAD
+[0.5.3]: https://github.com/bernierainerguy/ilive-monitor/compare/v0.5.2...v0.5.3
 [0.5.2]: https://github.com/bernierainerguy/ilive-monitor/compare/v0.5.1...v0.5.2
 [0.5.1]: https://github.com/bernierainerguy/ilive-monitor/compare/v0.5.0...v0.5.1
 [0.5.0]: https://github.com/bernierainerguy/ilive-monitor/compare/v0.4.4...v0.5.0

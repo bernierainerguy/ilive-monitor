@@ -9,6 +9,8 @@ Add entries under **Unreleased** as you go; `npm run release:minor|patch|major` 
 
 ## [Unreleased]
 
+## [0.5.1] - 2026-09-27
+
 ### Added
 - Every connect checks the saved mix configuration against the rack's own names for its mix channels. If they
   disagree, the faders lock and a red banner says so, because every send would reach a different mix than the
@@ -158,7 +160,8 @@ Add entries under **Unreleased** as you go; `npm run release:minor|patch|major` 
   - Licence registration and check-in, EULA and privacy notice, and update checks against
     whiteleyevents.co.uk (product `weim`).
 
-[Unreleased]: https://github.com/bernierainerguy/ilive-monitor/compare/v0.5.0...HEAD
+[Unreleased]: https://github.com/bernierainerguy/ilive-monitor/compare/v0.5.1...HEAD
+[0.5.1]: https://github.com/bernierainerguy/ilive-monitor/compare/v0.5.0...v0.5.1
 [0.5.0]: https://github.com/bernierainerguy/ilive-monitor/compare/v0.4.4...v0.5.0
 [0.4.4]: https://github.com/bernierainerguy/ilive-monitor/compare/v0.4.3...v0.4.4
 [0.4.3]: https://github.com/bernierainerguy/ilive-monitor/compare/v0.4.2...v0.4.3

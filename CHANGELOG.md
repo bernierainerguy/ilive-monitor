@@ -9,6 +9,12 @@ Add entries under **Unreleased** as you go; `npm run release:minor|patch|major` 
 
 ## [Unreleased]
 
+### Fixed
+- The on-connect check of the mix configuration could lock the faders when nothing was wrong. It ran after the
+  full pull from the rack (hundreds of queries), so the rack's last few name answers came in too late and those
+  channels looked unused. It now runs first, while the rack is quiet, and asks any silent channel a second time
+  before counting it unused. The log names any channels that really disagree.
+
 ## [0.5.2] - 2026-09-27
 
 ### Changed

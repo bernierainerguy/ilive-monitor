@@ -163,6 +163,26 @@ describe('IliveMidiProtocol over loopback', () => {
     p.close();
   });
 
+  it('asks silent channels again, so a busy rack\'s late answers aren\'t taken as unused', async () => {
+    const t = new LoopbackTransport();
+    const asked = new Map<number, number>();
+    t.peer.onReceive((b) => {
+      const s = parseIliveSysex([...b]);
+      if (!s || s.cmd !== 0x01) return;
+      const ch = s.payload[0]!;
+      asked.set(ch, (asked.get(ch) ?? 0) + 1);
+      if (ch === 0x20) t.peer.send(nameReply(s.n, ch, 'Ip1')); // the connect probe
+      if (ch === 0x61 && asked.get(ch) === 2) t.peer.send(nameReply(s.n, ch, 'Late')); // missed the first window
+    });
+    const p = new IliveMidiProtocol(t, { midiChannel: 0, rackName: 'R', queryTickMs: 0, queryTimeoutMs: 200 });
+    await p.open();
+    const names = await p.readRackNames(60);
+    expect(names.mixes[1]).toBe('Late');
+    expect(names.mixes[2]).toBeNull(); // silent twice: unused
+    expect(asked.get(0x62)).toBe(2);
+    p.close();
+  });
+
   it('opens by proving the rack answers', async () => {
     const { p } = setup();
     await expect(p.open()).resolves.toMatchObject({ name: 'FOH Rack', model: 'iDR48', ip: 'loopback' });

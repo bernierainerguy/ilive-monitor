@@ -232,14 +232,19 @@ export class RackSession {
       this.log.info('network', `Connected to ${identity.name} (${identity.ip})`, { protocol: protocol.id, isReconnect });
       this.startWatchdog();
 
+      // Check the saved mix configuration against the rack's own names before a single send can go out. First,
+      // while the rack is quiet: behind the full pull below, its answers can arrive too late and look missing.
+      const layoutMismatch = await this.checkLayout(target, protocol);
+      if (gen !== this.generation || this.protocol !== protocol) return;
+      if (layoutMismatch?.length) {
+        this.log.warn('network', `Mix configuration disagrees with the rack on ${layoutMismatch.length} mix channel(s): sends locked`, {
+          mixChannels: layoutMismatch.map((i) => i + 1).join(','),
+        });
+      }
+      this.patch({ layoutMismatch });
       // The rack is authoritative, always: other clients may have mixed while we were away.
       await protocol.requestState(this.cache.state);
       if (gen !== this.generation || this.protocol !== protocol) return; // dropped again during the pull
-      // Check the saved mix configuration against the rack's own names before a single send can go out.
-      const layoutMismatch = await this.checkLayout(target, protocol);
-      if (gen !== this.generation || this.protocol !== protocol) return;
-      if (layoutMismatch?.length) this.log.warn('network', `Mix configuration disagrees with the rack on ${layoutMismatch.length} mix channel(s): sends locked`);
-      this.patch({ layoutMismatch });
       this.patch({ phase: 'online', cacheUnverified: protocol.capabilities.stateQuery !== 'full' });
     } catch (err) {
       protocol?.close();

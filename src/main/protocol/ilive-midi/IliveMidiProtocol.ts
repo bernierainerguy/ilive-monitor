@@ -295,7 +295,8 @@ export class IliveMidiProtocol implements MixRackProtocol {
 
   /**
    * The names of all 32 mix channels and 8 FX sends, straight from the rack. Read-only: the same query as a
-   * connect makes. A channel that doesn't answer within the wait isn't in the rack's mix configuration.
+   * connect makes. A channel that doesn't answer twice isn't in the rack's mix configuration: a busy rack can
+   * answer late, so the silent ones are asked again before they count as unused.
    */
   async readRackNames(waitMs = 1500): Promise<RackNames> {
     const mixCh = Array.from({ length: IDR48.mixBuses }, (_, i) => CHANNEL_BASE.mix + i);
@@ -303,16 +304,21 @@ export class IliveMidiProtocol implements MixRackProtocol {
     const all = [...mixCh, ...fxCh];
     const got = new Map<number, string>();
     this.rawNames = got;
-    try {
+    const ask = async (channels: number[]) => {
       const tick = this.opts.queryTickMs ?? 10;
-      for (let i = 0; i < all.length; i += 8) {
+      for (let i = 0; i < channels.length; i += 8) {
         if (this.transport.state !== 'open') throw new Error('connection lost');
-        for (const ch of all.slice(i, i + 8)) this.transport.write(Uint8Array.from(encodeGetName(this.n, ch)));
+        for (const ch of channels.slice(i, i + 8)) this.transport.write(Uint8Array.from(encodeGetName(this.n, ch)));
         await new Promise((r) => setTimeout(r, tick));
       }
       // Unused channels never answer, so wait out the window rather than for every reply.
       const until = Date.now() + waitMs;
       while (got.size < all.length && Date.now() < until) await new Promise((r) => setTimeout(r, 25));
+    };
+    try {
+      await ask(all);
+      const silent = all.filter((ch) => !got.has(ch));
+      if (silent.length) await ask(silent);
     } finally {
       this.rawNames = null;
     }

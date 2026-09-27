@@ -62,6 +62,12 @@ export interface RackStatus {
    * Empty when the protocol can report its full state.
    */
   unconfirmed: string[];
+  /**
+   * Checked on every connect: the rack mix channels (0-based) where the saved mix configuration disagrees with
+   * the rack's own names for them. Non-empty: sends would reach the wrong mixes, so they're refused. Null: not
+   * checked (no configuration, or a protocol that can't read names).
+   */
+  layoutMismatch: number[] | null;
 }
 
 /**

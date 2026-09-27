@@ -12,6 +12,7 @@ import { StateCache } from '@main/rack/StateCache';
 import { MixerService } from '@main/services/MixerService';
 import { SettingsService } from '@main/services/SettingsService';
 import { handlers } from './electronMock';
+import { rackNamesFor } from './rackNames';
 
 export type Extras = Pick<IpcDeps, 'licence' | 'legal' | 'quit' | 'updates' | 'openExternal' | 'lock'>;
 
@@ -23,7 +24,7 @@ export type Extras = Pick<IpcDeps, 'licence' | 'legal' | 'quit' | 'updates' | 'o
  * `midiLike` makes the simulator behave like iLive MIDI: it can't report send levels.
  * The calling test file must `vi.mock('electron', () => import('../helpers/electronMock'))`.
  */
-export async function createBackend(extras: Extras = {}, opts: { dir?: string; midiLike?: boolean } = {}) {
+export async function createBackend(extras: Extras = {}, opts: { dir?: string; midiLike?: boolean; rackConfig?: unknown } = {}) {
   handlers.clear();
   const dir = opts.dir ?? mkdtempSync(join(tmpdir(), 'ilm-ui-'));
   const log = new Logger('error');
@@ -37,9 +38,11 @@ export async function createBackend(extras: Extras = {}, opts: { dir?: string; m
   const rack = new SimulatedRack();
   const cache = new StateCache(createDefaultMixerState(), 1);
   const bus = () => auxBusIndex(cache.state, settings.current.aux);
-  const session = new RackSession(cache, log, () => {
+  const session = new RackSession(cache, log, (target) => {
     const p = new SimulatorProtocol(rack, { meterFps: 0 });
     if (opts.midiLike) Object.defineProperty(p, 'capabilities', { value: { ...SIMULATOR_CAPABILITIES, stateQuery: 'partial' } });
+    // Standing in for a MIDI rack: answer name queries as a rack set up the way the target says would.
+    if (target.protocol === 'ilive-midi-tcp') Object.defineProperty(p, 'readRackNames', { value: async () => rackNamesFor(opts.rackConfig ?? target.mixConfig) });
     return p;
   }, { bus });
   const mixer = new MixerService(cache, session, log, bus);

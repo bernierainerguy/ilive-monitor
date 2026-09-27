@@ -9,6 +9,13 @@ Add entries under **Unreleased** as you go; `npm run release:minor|patch|major` 
 
 ## [Unreleased]
 
+### Added
+- Every connect checks the saved mix configuration against the rack's own names for its mix channels. If they
+  disagree, the faders lock and a red banner says so, because every send would reach a different mix than the
+  one shown. A check that can't be made locks the faders too. Before this, a wrong configuration was used
+  silently: switching "Rack mix configuration" on and saving the starting numbers unlocked the faders against a
+  rack laid out differently.
+
 ## [0.5.0] - 2026-09-27
 
 ### Added

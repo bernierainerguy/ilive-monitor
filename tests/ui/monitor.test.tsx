@@ -240,6 +240,22 @@ describe('the mix screen', () => {
     expect(reconnect).toHaveBeenCalledWith(expect.objectContaining({ host: '10.0.0.99' }));
   });
 
+  it('a saved configuration that doesn\'t match the rack locks the faders and says why', async () => {
+    const rackIs = { monoGroups: 0, stereoGroups: 0, monoAuxes: 4, stereoAuxes: 10, main: 'lr', monoMatrices: 0, stereoMatrices: 0, monoFx: 4, stereoFx: 0 };
+    const starter = { monoGroups: 8, stereoGroups: 0, monoAuxes: 12, stereoAuxes: 0, main: 'lrMono' as const, monoMatrices: 8, stereoMatrices: 0, monoFx: 8, stereoFx: 0 };
+    const { be } = await boot('/mix', { midiLike: true, rackConfig: rackIs });
+    await act(async () => {
+      be.settings.update({ aux: 1 });
+      be.settings.upsertRack({ id: 'studio', name: 'iDR48', host: '10.0.0.10', port: 51325, protocol: 'ilive-midi-tcp', midiChannel: 0, autoConnect: true, mixConfig: starter });
+      await be.bridge.invoke('rack:connect', { targetId: 'studio' });
+    });
+    await waitFor(() => expect(be.session.current.phase).toBe('online'));
+    expect(await screen.findByText(/doesn’t match the rack/)).toBeInTheDocument();
+    expect(screen.getAllByRole('slider').every((s) => s.getAttribute('aria-disabled') === 'true')).toBe(true);
+    const r = await be.bridge.invoke('mixer:dispatch', [{ t: 'send', strip: { kind: 'input', index: 0 }, target: { kind: 'mix', index: aux(be, 1) }, patch: { levelDb: 0 } }]);
+    expect(r.accepted).toBe(0);
+  });
+
   it('when the rack has fewer auxes than the one chosen, says so', async () => {
     const { be } = await boot();
     await act(async () => void be.settings.update({ aux: 30 }));

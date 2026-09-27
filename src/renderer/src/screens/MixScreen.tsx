@@ -69,7 +69,7 @@ export default function MixScreen() {
   }
 
   const live = rack.phase === 'online' || rack.phase === 'degraded';
-  const enabled = live && rack.capabilities.sends;
+  const enabled = live && rack.capabilities.sends && !rack.layoutMismatch?.length;
 
   return (
     <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>

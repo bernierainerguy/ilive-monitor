@@ -5,6 +5,7 @@ import type { RackMixConfig } from '@shared/mixLayout';
 import { Logger } from '@main/logging/Logger';
 import { RackSession, connectErrorMessage } from '@main/rack/RackSession';
 import { dbToLevel, levelToDb } from '@main/protocol/ilive-midi/codec';
+import { rackNamesFor } from '../helpers/rackNames';
 import { StateCache } from '@main/rack/StateCache';
 import { SIMULATOR_CAPABILITIES, SimulatedRack, SimulatorProtocol } from '@main/protocol/simulator/SimulatorProtocol';
 
@@ -24,6 +25,7 @@ function client(bus: number | null = 5) {
     const p = new SimulatorProtocol(rack, { meterFps: 0 });
     Object.defineProperty(p, 'capabilities', { value: { ...SIMULATOR_CAPABILITIES, stateQuery: 'partial' } });
     Object.defineProperty(p, 'normaliseLevel', { value: (db: number) => levelToDb(dbToLevel(db)) }); // MIDI's rounding
+    Object.defineProperty(p, 'readRackNames', { value: async () => rackNamesFor(MONITOR_RACK) }); // a rack set up as the target says
     protocols.push(p);
     return p;
   }, { echoGuardMs: 50, bus: () => state.bus });
@@ -158,6 +160,35 @@ describe('RackSession over a protocol that cannot report state', () => {
     expect(whileSyncing.length).toBeGreaterThan(0);
     expect(whileSyncing.every((ok) => !ok)).toBe(true);
     expect(c.session.supports(send(ip(0), 5, 0))).toBe(true);
+  });
+
+  it('checks the configuration against the rack\'s own names on connect, and refuses every send if they disagree', async () => {
+    const STARTER: RackMixConfig = { monoGroups: 8, stereoGroups: 0, monoAuxes: 12, stereoAuxes: 0, main: 'lrMono', monoMatrices: 8, stereoMatrices: 0, monoFx: 8, stereoFx: 0 };
+    const c = client(5);
+    c.session.connect({ ...target, mixConfig: STARTER }); // saved: the app's starting layout; the rack: MONITOR_RACK
+    await vi.waitFor(() => expect(c.session.current.phase).toBe('online'));
+    expect(c.session.current.layoutMismatch!.length).toBeGreaterThan(0);
+    expect(c.session.supports(send(ip(0), 5, 0))).toBe(false);
+
+    const ok = client(5);
+    await online(ok); // saved configuration = the rack's
+    expect(ok.session.current.layoutMismatch).toEqual([]);
+    expect(ok.session.supports(send(ip(0), 5, 0))).toBe(true);
+  });
+
+  it('a failed check locks sends rather than trusting the configuration', async () => {
+    const rack = new SimulatedRack();
+    const cache = new StateCache(createDefaultMixerState(), 1);
+    const session = new RackSession(cache, new Logger('error'), () => {
+      const p = new SimulatorProtocol(rack, { meterFps: 0 });
+      Object.defineProperty(p, 'readRackNames', { value: async () => { throw new Error('no reply'); } });
+      return p;
+    }, { bus: () => 5 });
+    session.connect(target);
+    await vi.waitFor(() => expect(session.current.phase).toBe('online'));
+    expect(session.current.layoutMismatch?.length).toBe(32);
+    expect(session.supports(send(ip(0), 5, 0))).toBe(false);
+    session.dispose();
   });
 
   it('a protocol that reports its full state has nothing unconfirmed', async () => {

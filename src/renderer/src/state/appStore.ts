@@ -24,7 +24,7 @@ interface AppStore {
 
 export const initialRackStatus: RackStatus = {
   phase: 'offline', targetId: null, identity: null, capabilities: NO_CAPABILITIES, health: emptyHealth(),
-  lastError: null, cacheUnverified: false, unconfirmed: [],
+  lastError: null, cacheUnverified: false, unconfirmed: [], layoutMismatch: null,
 };
 
 export const useAppStore = create<AppStore>((set) => ({

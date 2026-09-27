@@ -110,6 +110,14 @@ function StatusBanner() {
     if (rack.phase === 'offline') return <Alert severity="info" sx={sx} action={go}>Not connected to a rack. The faders are locked until you connect in Settings.</Alert>;
     return null; // connecting / syncing: brief, and the chip says so
   }
+  if (rack.layoutMismatch?.length) {
+    const n = rack.layoutMismatch.length;
+    return (
+      <Alert severity="error" sx={sx} action={go}>
+        The mix configuration in Settings doesn’t match the rack: {n} mix channel{n === 1 ? '' : 's'} disagree{n === 1 ? 's' : ''} with the rack’s own names, so sends would reach the wrong mixes. The faders are locked. Fix it in Settings › Rack with Read from rack.
+      </Alert>
+    );
+  }
   if (!rack.capabilities.sends) {
     return <Alert severity="warning" sx={sx} action={go}>Enter the rack’s mix configuration in Settings. Without it, sends can’t reach the right bus, so the faders are locked.</Alert>;
   }

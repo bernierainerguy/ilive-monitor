@@ -14,6 +14,7 @@ import {
 } from '@shared/rack';
 import type { RackTarget } from '@shared/settings';
 import { applyMixLayout, mixLayout, parseMixConfig, type MixLayout } from '@shared/mixLayout';
+import { layoutMismatches } from '@shared/mixConfigFromNames';
 import { createDefaultMixerState } from '@shared/domain/defaults';
 import type { Logger } from '../logging/Logger';
 import type { MixRackProtocol } from '../protocol/MixRackProtocol';
@@ -74,7 +75,7 @@ export class RackSession {
 
   private _status: RackStatus = {
     phase: 'offline', targetId: null, identity: null, capabilities: NO_CAPABILITIES, health: emptyHealth(),
-    lastError: null, cacheUnverified: false, unconfirmed: [],
+    lastError: null, cacheUnverified: false, unconfirmed: [], layoutMismatch: null,
   };
 
   readonly status = new Emitter<RackStatus>();
@@ -136,6 +137,8 @@ export class RackSession {
    */
   supports(c: MixerChange): boolean {
     const p = this._status.phase;
+    // A configuration that disagrees with the rack's own names would put this send on another mix.
+    if (c.t === 'send' && this._status.layoutMismatch?.length) return false;
     return !!this.protocol && (p === 'online' || p === 'degraded') && this.protocol.supports(c);
   }
 
@@ -145,7 +148,7 @@ export class RackSession {
     this.clearReconnect();
     this.target = target;
     this.everConnected = false;
-    this.patch({ targetId: target.id, lastError: null, health: emptyHealth() });
+    this.patch({ targetId: target.id, lastError: null, health: emptyHealth(), layoutMismatch: null });
     void this.attempt();
   }
 
@@ -153,7 +156,7 @@ export class RackSession {
     this.target = null;
     this.clearReconnect();
     this.teardownProtocol();
-    this.patch({ phase: 'offline', targetId: null, identity: null, capabilities: NO_CAPABILITIES });
+    this.patch({ phase: 'offline', targetId: null, identity: null, capabilities: NO_CAPABILITIES, layoutMismatch: null });
     this.log.info('network', 'Disconnected by user');
   }
 
@@ -232,6 +235,11 @@ export class RackSession {
       // The rack is authoritative, always: other clients may have mixed while we were away.
       await protocol.requestState(this.cache.state);
       if (gen !== this.generation || this.protocol !== protocol) return; // dropped again during the pull
+      // Check the saved mix configuration against the rack's own names before a single send can go out.
+      const layoutMismatch = await this.checkLayout(target, protocol);
+      if (gen !== this.generation || this.protocol !== protocol) return;
+      if (layoutMismatch?.length) this.log.warn('network', `Mix configuration disagrees with the rack on ${layoutMismatch.length} mix channel(s): sends locked`);
+      this.patch({ layoutMismatch });
       this.patch({ phase: 'online', cacheUnverified: protocol.capabilities.stateQuery !== 'full' });
     } catch (err) {
       protocol?.close();
@@ -241,6 +249,18 @@ export class RackSession {
       this.patch({ lastError: message });
       this.log.warn('network', `Connect failed: ${message}`, { target: target.host });
       this.scheduleReconnect();
+    }
+  }
+
+  /** Compare the configuration with what the rack calls its mix channels. Null when there's nothing to check. */
+  private async checkLayout(target: RackTarget, p: MixRackProtocol): Promise<number[] | null> {
+    const cfg = target.protocol === 'ilive-midi-tcp' ? parseMixConfig(target.mixConfig) : null;
+    if (!cfg || !p.readRackNames) return null;
+    try {
+      return layoutMismatches(cfg, (await p.readRackNames()).mixes);
+    } catch (err) {
+      this.log.warn('network', `Couldn't check the mix configuration against the rack: ${(err as Error).message}`);
+      return Array.from({ length: 32 }, (_, i) => i); // unchecked is not safe to send on
     }
   }
 
